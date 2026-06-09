@@ -1,3 +1,7 @@
+# Dev
+results/
+logs/
+
 ####################################### Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -263,6 +267,7 @@ __marimo__/
 build/
 Build/
 build-*/
+!scripts/build/
 
 # CMake generated files
 CMakeFiles/
@@ -333,6 +338,7 @@ Testing/
 build/
 Build/
 build-*/
+!scripts/build/
 
 # CMake generated files
 CMakeFiles/
