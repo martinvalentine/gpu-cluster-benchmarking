@@ -5,3 +5,9 @@
 	path = third_party/llama-cpp-turboquant
 	url = https://github.com/TheTom/llama-cpp-turboquant.git
 	branch = feature/turboquant-kv-cache
+[submodule "third_party/sglang"]
+	path = third_party/sglang
+	url = https://github.com/sgl-project/sglang.git
+[submodule "third_party/vllm"]
+	path = third_party/vllm
+	url = https://github.com/vllm-project/vllm.git
