@@ -1,7 +1,61 @@
 [project]
 name = "gpu-cluster-benchmarking"
 version = "0.1.0"
-description = "Add your description here"
+description = "LLM Self-Hosted Benchmark & Deployment — 6× NVIDIA A40 · vLLM · llama.cpp · SGLang"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[dependency-groups]
+common = [
+    "huggingface-hub",
+    "aiohttp",
+    "pandas",
+    "numpy",
+    "tqdm",
+    "transformers",
+    "prometheus-client",
+    "psutil",
+    "gputil",
+    "redis",
+]
+vllm = [
+    "vllm>=0.8.0",
+]
+sglang = [
+    "sglang[all]>=0.5.0",
+    "flashinfer-python",
+]
+llamacpp = [
+    {path = "third_party/llama.cpp", editable = true},
+]
+benchmark = [
+    "locust",
+    "llama-benchy",
+    "aiohttp",
+    "pandas",
+    "numpy",
+    "tqdm",
+    "transformers",
+]
+litellm = [
+    "litellm[proxy]>=1.40.0",
+    "redis",
+]
+monitoring = [
+    "prometheus-client",
+    "psutil",
+    "gputil",
+]
+all = [
+    {include-group = "common"},
+    {include-group = "vllm"},
+    {include-group = "sglang"},
+    {include-group = "llamacpp"},
+    {include-group = "benchmark"},
+    {include-group = "litellm"},
+    {include-group = "monitoring"},
+]
+
+[tool.uv]
+default-groups = ["common"]
