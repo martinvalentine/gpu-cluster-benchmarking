@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
+
 [dependency-groups]
 common = [
     "huggingface-hub",
@@ -19,16 +20,15 @@ common = [
     "gputil",
     "redis",
 ]
+
 vllm = [
-    "vllm>=0.8.0",
+    "vllm",
 ]
+
 sglang = [
-    "sglang[all]>=0.5.0",
-    "flashinfer-python",
+    "sglang",
 ]
-llamacpp = [
-    {path = "third_party/llama.cpp", editable = true},
-]
+
 benchmark = [
     "locust",
     "llama-benchy",
@@ -38,24 +38,40 @@ benchmark = [
     "tqdm",
     "transformers",
 ]
+
 litellm = [
     "litellm[proxy]>=1.40.0",
     "redis",
 ]
+
 monitoring = [
     "prometheus-client",
     "psutil",
     "gputil",
 ]
+
 all = [
-    {include-group = "common"},
-    {include-group = "vllm"},
-    {include-group = "sglang"},
-    {include-group = "llamacpp"},
-    {include-group = "benchmark"},
-    {include-group = "litellm"},
-    {include-group = "monitoring"},
+    { include-group = "common" },
+    { include-group = "benchmark" },
+    { include-group = "litellm" },
+    { include-group = "monitoring" },
 ]
+
 
 [tool.uv]
 default-groups = ["common"]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+conflicts = [
+    [
+        { group = "vllm" },
+        { group = "sglang" },
+    ],
+]
+extra-build-dependencies = { vllm = ["setuptools", "torch", "ninja", "packaging"], sglang = ["setuptools", "torch"] }
+
+
+[tool.uv.sources]
+vllm = { path = "third_party/vllm", editable = true }
+sglang = { path = "third_party/sglang/python", editable = true }
