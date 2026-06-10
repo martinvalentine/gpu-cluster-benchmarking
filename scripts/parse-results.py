@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Aggregate benchmark JSON results into CSV summary (benchmark_plan.md F.2)."""
+"""Aggregate benchmark JSON results into CSV summary.
+
+Lightweight CSV aggregation for pipeline use. For full formatted output
+(terminal + CSV + markdown), see report.py.
+"""
 
 import argparse
 import csv

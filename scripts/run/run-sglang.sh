@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-DEFAULT_MODEL="/workspace/models/hf/qwen2.5-32b-awq"
+DEFAULT_MODEL="models/hf/qwen2.5-0.6b"
 
 usage() {
     cat <<EOF
@@ -36,8 +36,8 @@ ENV OVERRIDES:
   SGLANG_MAX_TOTAL_TOKENS, SGLANG_QUANT
 
 EXAMPLES:
-  $(basename "$0")                                              # Defaults (32B AWQ, TP=6)
-  $(basename "$0") -tp 1 /workspace/models/hf/llama3.1-8b      # Single GPU, 8B
+  $(basename "$0")                                              # Defaults (qwen2.5-0.6b, TP=1)
+  $(basename "$0") -tp 1 models/hf/llama3.1-8b                 # Single GPU, 8B
   $(basename "$0") -p 8002 -tp 6 -q awq                        # AWQ quantization
   $(basename "$0") --disable-radix-cache                        # Baseline (no cache)
 EOF

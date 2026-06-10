@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 BASE_URL="${LITELLM_BENCH_URL:-http://localhost:4000}"
-MODEL="${LITELLM_BENCH_MODEL:-qwen35b-llamacpp}"
+MODEL="${LITELLM_BENCH_MODEL:-qwen0.5b-llamacpp}"
 RESULTS_DIR="${LITELLM_RESULTS_DIR:-${PROJECT_ROOT}/results/litellm}"
 METHOD="${LITELLM_BENCH_METHOD:-async}"
 

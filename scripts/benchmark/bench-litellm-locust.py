@@ -37,7 +37,7 @@ class CachedUser(HttpUser):
     @task(3)
     def chat_cached(self):
         payload = {
-            "model": "qwen35b-llamacpp",
+            "model": "qwen0.5b-llamacpp",
             "messages": [{"role": "user", "content": random.choice(PROMPTS)}],
             "max_tokens": 256,
             "stream": True,
@@ -54,7 +54,7 @@ class CachedUser(HttpUser):
     @task(1)
     def chat_unique(self):
         payload = {
-            "model": "qwen35b-llamacpp",
+            "model": "qwen0.5b-llamacpp",
             "messages": [
                 {"role": "user", "content": f"Unique request {uuid.uuid4()}"}
             ],

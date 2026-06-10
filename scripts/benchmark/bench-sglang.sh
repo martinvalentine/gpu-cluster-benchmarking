@@ -5,10 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 BASE_URL="${SGLANG_BENCH_URL:-http://localhost:8002}"
-MODEL="${SGLANG_BENCH_MODEL:-/workspace/models/hf/qwen2.5-32b-awq}"
+MODEL="${SGLANG_BENCH_MODEL:-models/hf/qwen2.5-0.6b}"
 RESULTS_DIR="${SGLANG_RESULTS_DIR:-${PROJECT_ROOT}/results/sglang}"
 DATASET="${SGLANG_BENCH_DATASET:-sharegpt}"
-DATASET_PATH="${SGLANG_BENCH_DATASET_PATH:-/workspace/datasets/sharegpt.json}"
+DATASET_PATH="${SGLANG_BENCH_DATASET_PATH:-${PROJECT_ROOT}/datasets/sharegpt.json}"
+SGLANG_BIN="${SGLANG_BIN:-$(command -v sglang 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/python3 -m sglang")}"
 
 usage() {
     cat <<EOF
@@ -19,7 +20,7 @@ Measures TTFT, TPOT, ITL, throughput across phases.
 
 OPTIONS:
   -u, --url URL           SGLang base URL (default: http://localhost:8002)
-  -m, --model PATH        Model path (default: /workspace/models/hf/qwen2.5-32b-awq)
+  -m, --model PATH        Model path (default: models/hf/qwen2.5-0.6b)
   -o, --output DIR        Results directory (default: ./results/sglang)
   -d, --dataset NAME      Dataset: sharegpt, random (default: sharegpt)
   -dp, --dataset-path P   Dataset file path
@@ -91,7 +92,7 @@ run_bench() {
 
     echo "[$(date +%H:%M:%S)] SGLang ${phase_name} conc=${conc} num_prompts=${num_prompts}"
 
-    python3 -m sglang.bench_serving \
+    $SGLANG_BIN.bench_serving \
         --backend sglang \
         --base-url "$BASE_URL" \
         --model "$model" \
@@ -109,7 +110,7 @@ run_bench() {
 
 # P1: Light Load — 8B model
 if [[ "$PHASE" == "all" || "$PHASE" == "p1" ]]; then
-    P1_MODEL="${SGLANG_P1_MODEL:-/workspace/models/hf/llama3.1-8b}"
+    P1_MODEL="${SGLANG_P1_MODEL:-${PROJECT_ROOT}/models/hf/llama3.1-8b}"
     echo "--- Phase P1: Light Load (8B) ---"
     for CONC in 1 32 64 128; do
         run_bench "p1_light" "$P1_MODEL" "$CONC"
@@ -119,7 +120,7 @@ fi
 
 # P2: Medium Load — 14B model
 if [[ "$PHASE" == "all" || "$PHASE" == "p2" ]]; then
-    P2_MODEL="${SGLANG_P2_MODEL:-/workspace/models/hf/qwen2.5-14b}"
+    P2_MODEL="${SGLANG_P2_MODEL:-${PROJECT_ROOT}/models/hf/qwen2.5-14b}"
     echo "--- Phase P2: Medium Load (14B) ---"
     for CONC in 1 16 32 64; do
         run_bench "p2_medium" "$P2_MODEL" "$CONC"

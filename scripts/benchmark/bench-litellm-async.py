@@ -256,7 +256,7 @@ def main():
     parser.add_argument(
         "--base-url", default="http://localhost:4000", help="LiteLLM proxy URL"
     )
-    parser.add_argument("--model", default="qwen35b-llamacpp", help="Model name")
+    parser.add_argument("--model", default="qwen0.5b-llamacpp", help="Model name")
     parser.add_argument("--concurrency", type=int, default=10, help="Max concurrent")
     parser.add_argument("--num-requests", type=int, default=100, help="Total requests")
     parser.add_argument("--max-tokens", type=int, default=256, help="Max tokens/response")

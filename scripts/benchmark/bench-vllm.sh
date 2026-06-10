@@ -5,10 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 BASE_URL="${VLLM_BENCH_URL:-http://localhost:8000}"
-MODEL="${VLLM_BENCH_MODEL:-/workspace/models/hf/qwen2.5-32b-awq}"
+MODEL="${VLLM_BENCH_MODEL:-models/hf/qwen2.5-0.6b}"
 RESULTS_DIR="${VLLM_RESULTS_DIR:-${PROJECT_ROOT}/results/vllm}"
 DATASET="${VLLM_BENCH_DATASET:-sharegpt}"
-DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-/workspace/datasets/sharegpt.json}"
+DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-${PROJECT_ROOT}/datasets/sharegpt.json}"
+VLLM_BIN="${VLLM_BIN:-$(command -v vllm 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/vllm")}"
 
 usage() {
     cat <<EOF
@@ -19,7 +20,7 @@ Measures TTFT, TPOT, ITL, throughput across phases.
 
 OPTIONS:
   -u, --url URL           Server base URL (default: http://localhost:8000)
-  -m, --model NAME        Model name for request (default: /workspace/models/hf/qwen2.5-32b-awq)
+  -m, --model NAME        Model name for request (default: models/hf/qwen2.5-0.6b)
   -o, --output DIR        Results directory (default: ./results/vllm)
   -d, --dataset NAME      Dataset: sharegpt, random (default: sharegpt)
   -dp, --dataset-path P   Dataset file path
@@ -67,9 +68,10 @@ run_bench() {
 
     echo "[$(date +%H:%M:%S)] ${phase_name} conc=${conc} num_prompts=${num_prompts}"
 
-    vllm bench serve \
+    $VLLM_BIN bench serve \
         --backend openai-chat \
         --base-url "$BASE_URL" \
+        --endpoint /v1/chat/completions \
         --model "$model" \
         --dataset-name "$DATASET" \
         ${DATASET_PATH:+--dataset-path "$DATASET_PATH"} \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -19,6 +19,7 @@ OPTIONS:
   -f, --framework FW      Run specific framework: vllm, sglang, llamacpp, litellm, all (default: all)
   -p, --phase PHASE       Run specific phase: p1, p2, p3, all (default: all)
   --skip-health-check     Skip pre-flight health checks
+  -y, --yes               Auto-accept prompts (for CI / non-interactive use)
   -h, --help              Show this help
 
 EXAMPLES:
@@ -33,6 +34,7 @@ EOF
 FRAMEWORK="all"
 PHASE="all"
 SKIP_HEALTH=0
+AUTO_YES=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -40,6 +42,7 @@ while [[ $# -gt 0 ]]; do
         -f|--framework)         FRAMEWORK="$2"; shift 2 ;;
         -p|--phase)             PHASE="$2"; shift 2 ;;
         --skip-health-check)    SKIP_HEALTH=1; shift ;;
+        -y|--yes)               AUTO_YES=1; shift ;;
         -h|--help)              usage ;;
         *)                      echo "Unknown: $1" >&2; usage ;;
     esac
@@ -93,8 +96,10 @@ if [[ "$SKIP_HEALTH" -eq 0 ]]; then
     if [[ $FAILED -gt 0 ]]; then
         echo ""
         echo -e "  ${YELLOW}WARNING: $FAILED service(s) not reachable.${NC}"
-        read -rp "  Continue anyway? [y/N] " yn
-        [[ "$yn" =~ ^[Yy] ]] || exit 1
+        if [[ $AUTO_YES -eq 0 && -t 0 ]]; then
+            read -rp "  Continue anyway? [y/N] " yn
+            [[ "$yn" =~ ^[Yy] ]] || exit 1
+        fi
     fi
     echo ""
 fi

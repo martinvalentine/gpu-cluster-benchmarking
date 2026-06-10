@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
@@ -11,7 +11,7 @@ DIM='\033[2m'
 NC='\033[0m'
 
 PROXY_URL="${LITELLM_PROXY_URL:-http://localhost:4000}"
-MODEL="${LITELLM_MODEL:-qwen35b-llamacpp}"
+MODEL="${LITELLM_MODEL:-qwen0.5b-llamacpp}"
 TIMEOUT=60
 MAX_TOKENS=64
 

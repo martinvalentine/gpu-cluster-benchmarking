@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Generate a formatted benchmark report from results.
 
+Full formatted report (terminal + CSV + markdown). For lightweight CSV
+aggregation used by the pipeline, see parse-results.py.
+
 Reads JSON/TSV files from results/ and produces:
   - Terminal output (colored)
   - Markdown report (results/report.md)
