@@ -10,6 +10,7 @@ dependencies = []
 [dependency-groups]
 common = [
     "huggingface-hub",
+    "pyyaml",
     "aiohttp",
     "pandas",
     "numpy",

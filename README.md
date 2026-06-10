@@ -39,12 +39,17 @@ gpu-cluster-benchmarking/
 │   │   ├── build-llamacpp-turbo.sh  # Build llama-cpp-turboquant
 │   │   ├── build-vllm.sh
 │   │   └── build-sglang.sh
+│   ├── bench-models.sh              # Per-model benchmark orchestrator
+│   ├── start-all-tmux.sh            # Start all servers in tmux
+│   ├── stop-all.sh                  # Stop all servers
 │   ├── download-models.py           # Batch download from HuggingFace
+│   ├── gen-litellm-config.py        # Generate litellm_config.yaml
 │   ├── run-all-benchmarks.sh        # Master benchmark runner
 │   ├── run-pipeline.sh              # Full pipeline: download → bench → report
 │   ├── report.py                    # Generate formatted report (CSV + markdown)
 │   ├── parse-results.py             # Aggregate results → CSV
 │   ├── monitor-gpu.sh               # Real-time GPU monitoring
+│   ├── test-all.sh                  # Test all LLM endpoints
 │   ├── init-bare-machine.sh         # Bare metal setup
 │   ├── docker/
 │   │   └── start.sh                 # Container entrypoint (RunPod)
@@ -52,7 +57,7 @@ gpu-cluster-benchmarking/
 │       ├── test-llm.sh              # Test LLM endpoints
 │       └── test-proxy.sh            # Test LiteLLM proxy
 ├── configs/
-│   └── models.yaml                  # Model download config
+│   └── models.yaml                  # Model config + cluster settings
 ├── docs/                            # Documentation
 │   ├── setup.md                     # Environment setup
 │   ├── build.md                     # Build llama-cpp-turboquant
@@ -61,10 +66,8 @@ gpu-cluster-benchmarking/
 │   ├── benchmark.md                 # Run benchmarks (all params)
 │   └── config.md                    # Config files reference
 ├── pyproject.toml                   # uv dependency groups
-├── litellm_config.yaml              # LiteLLM proxy config
-├── .env                             # Environment variables
+├── litellm_config.yaml              # LiteLLM proxy config (auto-generated)
 ├── Dockerfile.serving               # Docker image (vLLM + llama-cpp-turboquant)
-├── run_pod_cloud.md                 # RunPod deployment guide
 └── benchmark_plan.md                # Benchmark strategy
 ```
 
@@ -82,32 +85,88 @@ uv sync --group common --group benchmark --group litellm --group monitoring
 # 3. Start Redis
 redis-server --daemonize yes
 
-# 4. Start servers (each in separate tmux)
-uv run ./scripts/run/run-llamacpp.sh                         # port 8001
-uv run ./scripts/run/run-vllm.sh                              # port 8000
-uv run ./scripts/run/run-sglang.sh                            # port 8002
-uv run ./scripts/run/run-embedding-server.sh                  # port 8003
-OPENAI_API_BASE=http://localhost:8003/v1 OPENAI_API_KEY=EMPTY \
-    uv run ./scripts/run/run-proxy.sh                         # port 4000
+# 4. Download models
+uv run python scripts/download-models.py
 
-# 5. Run benchmarks
-uv run ./scripts/benchmark/bench-llamacpp.sh                  # llama.cpp
-uv run ./scripts/benchmark/bench-vllm.sh -p p1                # vLLM
-uv run ./scripts/benchmark/bench-sglang.sh -p p1              # SGLang
-uv run ./scripts/run-all-benchmarks.sh                        # all frameworks
+# 5. Start all servers in tmux (reads configs/models.yaml)
+./scripts/start-all-tmux.sh
 
-# 6. Full pipeline (download → bench → parse)
-uv run ./scripts/run-pipeline.sh --only-download              # download models
-uv run ./scripts/run-pipeline.sh --skip-download              # benchmark only
+# 6. Run all benchmarks (per-model loop, reads configs/models.yaml)
+./scripts/bench-models.sh
+
+# 7. Or run specific phase/model
+./scripts/bench-models.sh -p p0            # P0 models only
+./scripts/bench-models.sh -m qwen32b-awq   # Specific model
+./scripts/bench-models.sh --dry-run        # Preview actions
 ```
+
+## Configuration
+
+Everything is configured in **`configs/models.yaml`** — this is the single source of truth.
+
+### How configuration flows
+
+```
+configs/models.yaml
+  ├── start-all-tmux.sh  → reads YAML → starts servers with correct paths/settings
+  ├── bench-models.sh    → reads YAML → loops models, manages server lifecycle
+  ├── download-models.py → reads YAML → downloads model weights
+  └── gen-litellm-config.py → reads YAML → generates litellm_config.yaml
+```
+
+**Orchestrator scripts** (`bench-models.sh`, `start-all-tmux.sh`) read `configs/models.yaml` directly — no env vars needed.
+
+**Individual scripts** (`run-vllm.sh`, `bench-vllm.sh`, etc.) load `.env` from project root, then accept env vars:
+
+```bash
+# Copy template and customize
+cp .env_example .env
+vim .env
+
+# Run script — .env is loaded automatically
+./scripts/run/run-vllm.sh
+```
+
+Or set env vars inline:
+
+```bash
+VLLM_MODEL=/workspace/models/hf/qwen2.5-32b-awq VLLM_QUANT=awq ./scripts/run/run-vllm.sh
+```
+
+### Cluster Configuration
+
+Edit `configs/models.yaml` to match your pod's GPU count:
+
+```yaml
+cluster:
+  gpu_count: 0              # 0 = auto-detect from nvidia-smi
+
+  vllm:
+    tp: 1                   # Tensor parallel size
+    gpu_mem_util: "0.87"    # GPU memory utilization
+    max_model_len: 4096     # Max context length
+
+  llamacpp:
+    n_parallel: 4           # Concurrent slots
+    ctx_size: 4096          # Context window
+```
+
+Per-model overrides take precedence:
+```yaml
+- name: qwen32b-awq
+  vllm_tp: 6               # Override cluster default
+  vllm_gpu_mem: "0.87"
+  vllm_quant: awq
+```
+
+Models requiring more GPUs than `cluster.gpu_count` are auto-skipped by `bench-models.sh`.
 
 ## Download Models
 
 ```bash
-# Edit configs/models.yaml to enable models, then:
 uv run python scripts/download-models.py
-uv run python scripts/download-models.py --dir /path/to/models
-uv run python scripts/download-models.py --only qwen7b-gguf
+uv run python scripts/download-models.py --only qwen32b-awq
+uv run python scripts/download-models.py --phase p0 p1
 uv run python scripts/download-models.py --dry-run
 ```
 
@@ -126,6 +185,9 @@ uv run python scripts/download-models.py --dry-run
 
 | Script | Purpose |
 |--------|---------|
+| `scripts/bench-models.sh` | Per-model benchmark orchestrator (loops over all models) |
+| `scripts/start-all-tmux.sh` | Start all servers in tmux (reads cluster config) |
+| `scripts/stop-all.sh` | Stop all server processes |
 | `scripts/run/run-llamacpp.sh` | Start llama-cpp-turboquant (TurboQuant KV cache) |
 | `scripts/run/run-vllm.sh` | Start vLLM (prefix caching + chunked prefill) |
 | `scripts/run/run-sglang.sh` | Start SGLang (RadixAttention + torch.compile) |
@@ -141,6 +203,7 @@ uv run python scripts/download-models.py --dry-run
 | `scripts/report.py` | Generate formatted report (terminal + CSV + markdown) |
 | `scripts/monitor-gpu.sh` | Real-time GPU monitoring with CSV logging |
 | `scripts/download-models.py` | Config-driven HuggingFace batch download |
+| `scripts/gen-litellm-config.py` | Generate litellm_config.yaml from models.yaml |
 
 ## Dependency Groups
 

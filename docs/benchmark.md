@@ -2,6 +2,59 @@
 
 Requires at least one server running (see [run.md](run.md)).
 
+## Per-Model Benchmark Loop (Recommended)
+
+Runs end-to-end benchmarks for all enabled models, starting/stopping servers between each. Reads config from `configs/models.yaml` — **no env vars needed**.
+
+```bash
+./scripts/bench-models.sh [OPTIONS]
+```
+
+**Parameters:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-o, --output DIR` | `./results` | Results root directory |
+| `-p, --phase PHASE` | `all` | Phase: p0, p1, p2, p3, all |
+| `-m, --model NAME` | all enabled | Specific model (can repeat) |
+| `--skip-health-check` | | Skip pre-flight health checks |
+| `-y, --yes` | | Auto-accept prompts (CI) |
+| `--dry-run` | | Preview without executing |
+
+**Examples:**
+
+```bash
+# All enabled models
+./scripts/bench-models.sh
+
+# P0 models only
+./scripts/bench-models.sh -p p0
+
+# Specific model
+./scripts/bench-models.sh -m qwen32b-awq
+
+# Preview actions
+./scripts/bench-models.sh --dry-run
+
+# Skip health checks
+./scripts/bench-models.sh --skip-health-check
+```
+
+**What it does per model:**
+
+1. Starts vLLM with HF model → runs vLLM benchmarks → stops server
+2. Starts llama.cpp with GGUF model → runs llama.cpp benchmarks → stops server
+3. Results saved to `results/run-N/{vllm,llamacpp}/`
+
+**Auto-skip:** Models with `vllm_tp > gpu_count` are automatically skipped.
+
+## Start All Servers
+
+```bash
+./scripts/start-all-tmux.sh    # Start all servers in tmux
+./scripts/stop-all.sh          # Stop all servers
+```
+
 ## llama-cpp-turboquant Benchmark
 
 Direct HTTP benchmark — tests single user latency, concurrent throughput, and long context.
@@ -25,19 +78,6 @@ uv run ./scripts/benchmark/bench-llamacpp.sh [OPTIONS]
 3. **Long context** — prefill speed at different context sizes
 4. **Server metrics** — /metrics snapshot (if available)
 
-**Examples:**
-
-```bash
-# Run all tests
-uv run ./scripts/benchmark/bench-llamacpp.sh
-
-# Custom concurrency levels
-uv run ./scripts/benchmark/bench-llamacpp.sh -c "1 4 8"
-
-# Remote server
-uv run ./scripts/benchmark/bench-llamacpp.sh -u http://gpu-pod:8001/v1
-```
-
 ## vLLM Benchmark
 
 ```bash
@@ -57,7 +97,7 @@ uv run ./scripts/benchmark/bench-vllm.sh [OPTIONS]
 
 ```bash
 uv run ./scripts/benchmark/bench-vllm.sh -p p1
-uv run ./scripts/benchmark/bench-vllm.sh -p p3 -m Qwen3.6-35B-A3B-UDT-Q5_K_XL_MTP
+uv run ./scripts/benchmark/bench-vllm.sh -p p3 -m /workspace/models/hf/qwen2.5-32b-awq
 ```
 
 ## SGLang Benchmark
