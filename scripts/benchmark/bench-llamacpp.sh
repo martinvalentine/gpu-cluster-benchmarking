@@ -4,6 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
 BASE_URL="${LLAMA_BENCH_URL:-http://localhost:8001/v1}"
 RESULTS_DIR="${LLAMA_RESULTS_DIR:-${PROJECT_ROOT}/results/llamacpp}"
 CONC_LEVELS="${LLAMA_CONC_LEVELS:-1 4 8 16}"
