@@ -25,18 +25,16 @@ def load_config(path: Path) -> dict:
 def resolve_model_id(model: dict, base_dir: Path, project_root: Path) -> str:
     """Determine the model ID the backend will report.
 
-    - vLLM/SGLang: reports the path passed to --model (relative to cwd)
+    - vLLM/SGLang: reports the path passed to --model (absolute)
     - llama.cpp: reports the GGUF filename
 
-    Returns relative paths for vLLM/SGLang (matching how servers are started).
+    Returns absolute paths for vLLM/SGLang (matching how servers are started).
     """
     backend = model.get("backend", "vllm")
     local_dir = model.get("local_dir", "")
 
     if backend in ("vllm", "sglang"):
-        # vLLM/SGLang report the path passed to --model
-        # start-all-tmux.sh passes: models/hf/qwen2.5-0.6b (relative)
-        return f"models/{local_dir}"
+        return str(base_dir / local_dir)
 
     if backend == "llamacpp":
         # Check if this is an embedding model (special case)
@@ -60,7 +58,7 @@ def resolve_model_id(model: dict, base_dir: Path, project_root: Path) -> str:
         # Fallback: construct from local_dir name
         return Path(local_dir).name + ".gguf"
 
-    return f"models/{local_dir}"
+    return str(base_dir / local_dir)
 
 
 def generate_config(config: dict, project_root: Path) -> dict:
@@ -81,7 +79,7 @@ def generate_config(config: dict, project_root: Path) -> dict:
             continue
 
         backend = m.get("backend", "vllm")
-        port = ports.get(backend, 8000)
+        port = m.get("api_port", ports.get(backend, 8000))
         proxy_name = m.get("proxy_name", m.get("name", "unknown"))
         model_id = resolve_model_id(m, base_dir, project_root)
 

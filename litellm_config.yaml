@@ -2,16 +2,41 @@ model_list:
 - model_name: embedding-model
   litellm_params:
     model: openai/Qwen3-Embedding-0.6B-Q8_0.gguf
-    api_base: http://localhost:8001/v1
+    api_base: http://localhost:8003/v1
     api_key: EMPTY
 - model_name: qwen0.5b-vllm
   litellm_params:
-    model: openai/models/hf/qwen2.5-0.6b
+    model: openai//workspace/models/hf/qwen2.5-0.6b
     api_base: http://localhost:8000/v1
     api_key: EMPTY
 - model_name: qwen0.5b-llamacpp
   litellm_params:
     model: openai/qwen2.5-0.5b-instruct-q4_k_m.gguf
+    api_base: http://localhost:8001/v1
+    api_key: EMPTY
+- model_name: qwen7b-vllm
+  litellm_params:
+    model: openai//workspace/models/hf/qwen2.5-7b
+    api_base: http://localhost:8000/v1
+    api_key: EMPTY
+- model_name: qwen7b-llamacpp
+  litellm_params:
+    model: openai/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
+    api_base: http://localhost:8001/v1
+    api_key: EMPTY
+- model_name: qwen14b-llamacpp
+  litellm_params:
+    model: openai/qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf
+    api_base: http://localhost:8001/v1
+    api_key: EMPTY
+- model_name: qwen32b-vllm
+  litellm_params:
+    model: openai//workspace/models/hf/qwen2.5-32b-awq
+    api_base: http://localhost:8000/v1
+    api_key: EMPTY
+- model_name: qwen32b-llamacpp
+  litellm_params:
+    model: openai/qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf
     api_base: http://localhost:8001/v1
     api_key: EMPTY
 router_settings:
