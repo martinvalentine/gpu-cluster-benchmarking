@@ -213,22 +213,19 @@ do_test() {
 do_benchmark() {
     mkdir -p "$RESULTS_DIR"/{vllm,sglang,llamacpp,litellm}
 
-    # Check servers are running
-    local servers_up=0
-    for port in 8000 8001; do
-        if curl -sf "http://localhost:${port}/v1/models" &>/dev/null; then
-            servers_up=$((servers_up + 1))
-        fi
-    done
-
-    if [[ $servers_up -eq 0 ]]; then
-        fail "No servers running on ports 8000-8001"
-        echo -e "  Start servers first: ${CYAN}./scripts/start-all-tmux.sh${NC}"
-        exit 1
+    # Build args
+    local args=()
+    if [[ "$PHASE" != "all" ]]; then
+        args+=("-p" "$PHASE")
+    fi
+    if [[ ${#MODELS[@]} -gt 0 ]]; then
+        for m in "${MODELS[@]}"; do
+            args+=("-m" "$m")
+        done
     fi
 
-    # Run benchmark
-    bash scripts/benchmark-all.sh
+    # Run per-model benchmarks (manages server lifecycle per model)
+    bash scripts/bench-models.sh "${args[@]+"${args[@]}"}"
 
     # Generate report
     log "Generating report..."

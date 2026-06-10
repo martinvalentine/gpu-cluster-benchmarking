@@ -15,7 +15,7 @@ resolve_model_paths() {
 
     local resolved
     resolved=$(uv run python - "$yaml_path" <<'PYEOF'
-import sys, yaml
+import sys, yaml, subprocess
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
@@ -25,7 +25,26 @@ with open(config_path) as f:
 base_dir = Path(cfg.get("base_dir", "models"))
 models = cfg.get("models", [])
 
+# Cluster config
+cluster = cfg.get("cluster", {})
+gpu_count = cluster.get("gpu_count", 0)
+if not gpu_count:
+    try:
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        gpu_count = len(out.strip().splitlines()) if out.strip() else 1
+    except Exception:
+        gpu_count = 1
+
+vllm_cluster = cluster.get("vllm", {})
+
 vllm_path = ""
+vllm_tp = vllm_cluster.get("tp", 1)
+vllm_gpu_mem = vllm_cluster.get("gpu_mem_util", "0.87")
+vllm_max_model_len = vllm_cluster.get("max_model_len", 4096)
+vllm_max_num_seqs = vllm_cluster.get("max_num_seqs", 64)
 llama_path = ""
 embed_path = ""
 
@@ -37,9 +56,31 @@ for m in models:
     phase = m.get("phase", "")
 
     if backend == "vllm" and not vllm_path:
-        vllm_path = str(base_dir / local_dir)
+        model_path = str(base_dir / local_dir)
+        # Use per-model TP if set, else cluster default, else cap at gpu_count
+        m_tp = m.get("vllm_tp", vllm_tp)
+        m_gpu_mem = m.get("vllm_gpu_mem", vllm_gpu_mem)
+        m_max_seqs = m.get("vllm_max_seqs", vllm_max_num_seqs)
+        m_max_model_len = vllm_max_model_len
+        # Cap TP at available GPUs
+        if int(m_tp) > gpu_count:
+            m_tp = gpu_count
+        vllm_path = model_path
+        vllm_tp = int(m_tp)
+        vllm_gpu_mem = str(m_gpu_mem)
+        vllm_max_num_seqs = int(m_max_seqs)
     elif backend == "llamacpp" and phase == "embedding" and not embed_path:
-        embed_path = str(base_dir / local_dir)
+        embed_dir = base_dir / local_dir
+        if embed_dir.exists():
+            from fnmatch import fnmatch
+            include = m.get("include", "*.gguf")
+            matches = sorted(f for f in embed_dir.iterdir() if fnmatch(f.name, include))
+            if matches:
+                embed_path = str(matches[0])
+            else:
+                embed_path = str(embed_dir)
+        else:
+            embed_path = str(embed_dir)
     elif backend == "llamacpp" and phase != "embedding" and not llama_path:
         include = m.get("include", "*.gguf")
         gguf_dir = base_dir / local_dir
@@ -55,32 +96,46 @@ for m in models:
 
 if vllm_path:
     print(f"VLLM_MODEL={vllm_path}")
+    print(f"VLLM_TP={vllm_tp}")
+    print(f"VLLM_GPU_MEM={vllm_gpu_mem}")
+    print(f"VLLM_MAX_SEQS={vllm_max_num_seqs}")
 if llama_path:
     print(f"LLAMA_MODEL={llama_path}")
 if embed_path:
     print(f"EMBED_MODEL={embed_path}")
+print(f"GPU_COUNT={gpu_count}")
 PYEOF
     ) || return 0
 
     while IFS='=' read -r key val; do
         case "$key" in
-            VLLM_MODEL)  VLLM_MODEL="$val" ;;
-            LLAMA_MODEL) LLAMA_MODEL="$val" ;;
-            EMBED_MODEL) EMBED_MODEL="$val" ;;
+            VLLM_MODEL)      VLLM_MODEL="$val" ;;
+            VLLM_TP)         VLLM_TP="$val" ;;
+            VLLM_GPU_MEM)    VLLM_GPU_MEM="$val" ;;
+            VLLM_MAX_SEQS)   VLLM_MAX_NUM_SEQS="$val" ;;
+            LLAMA_MODEL)     LLAMA_MODEL="$val" ;;
+            EMBED_MODEL)     EMBED_MODEL="$val" ;;
+            GPU_COUNT)       GPU_COUNT="$val" ;;
         esac
     done <<< "$resolved"
 }
 
 resolve_model_paths
 
-VLLM_MODEL="${VLLM_MODEL:-${PROJECT_ROOT}/models/hf/qwen2.5-0.6b}"
-LLAMA_MODEL="${LLAMA_MODEL:-${PROJECT_ROOT}/models/gguf/qwen2.5-0.6b/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
-EMBED_MODEL="${EMBED_MODEL:-${PROJECT_ROOT}/models/gguf/qwen3-embedding-0.6b/Qwen3-Embedding-0.6B-Q8_0.gguf}"
+VLLM_MODEL="${VLLM_MODEL:-}"
+LLAMA_MODEL="${LLAMA_MODEL:-}"
+EMBED_MODEL="${EMBED_MODEL:-}"
 
 TP=${VLLM_TP:-1}
-GPU_MEM_UTIL=${VLLM_GPU_MEM_UTIL:-0.15}
+GPU_MEM_UTIL=${VLLM_GPU_MEM:-0.87}
 MAX_MODEL_LEN=${VLLM_MAX_MODEL_LEN:-4096}
 MAX_NUM_SEQS=${VLLM_MAX_NUM_SEQS:-64}
+GPU_COUNT=${GPU_COUNT:-0}
+
+# Auto-detect GPU count if not set
+if [[ "$GPU_COUNT" -eq 0 ]]; then
+    GPU_COUNT=$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l || echo 1)
+fi
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -100,6 +155,12 @@ echo -e "  ${GREEN}${BOLD}══════════════════
 echo -e "  ${GREEN}${BOLD}  Starting all LLM servers in tmux${NC}"
 echo -e "  ${GREEN}${BOLD}══════════════════════════════════════════════════${NC}"
 echo ""
+echo -e "  ${CYAN}GPU Count${NC}     $GPU_COUNT"
+echo -e "  ${CYAN}vLLM TP${NC}       $TP"
+echo -e "  ${CYAN}vLLM GPU Mem${NC}  $GPU_MEM_UTIL"
+echo -e "  ${CYAN}Max Context${NC}   $MAX_MODEL_LEN"
+echo -e "  ${CYAN}Max Seqs${NC}      $MAX_NUM_SEQS"
+echo ""
 
 # ── Pre-flight checks ─────────────────────────────────────────
 echo -e "  ${DIM}Pre-flight checks...${NC}"
@@ -108,7 +169,7 @@ MISSING=0
 
 check_model() {
     local path="$1" name="$2"
-    if [[ -f "$path" ]]; then
+    if [[ -e "$path" ]]; then
         ok "$name: $path"
     else
         fail "$name: not found at $path"
@@ -153,7 +214,7 @@ sleep 1
 log "Starting servers..."
 
 tmux new-session -d -s "$SESSION" -n "vllm" \
-    "cd $PROJECT_ROOT && uv run vllm serve $VLLM_MODEL \
+    "cd $PROJECT_ROOT && vllm serve $VLLM_MODEL \
         --host 0.0.0.0 --port 8000 \
         --tensor-parallel-size $TP \
         --gpu-memory-utilization $GPU_MEM_UTIL \
