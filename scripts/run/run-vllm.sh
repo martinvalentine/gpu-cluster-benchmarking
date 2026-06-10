@@ -4,7 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-DEFAULT_MODEL="models/hf/qwen2.5-0.6b"
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
+DEFAULT_MODEL="${VLLM_MODEL:-}"
 
 usage() {
     cat <<EOF
@@ -18,7 +23,7 @@ POSITIONAL:
 OPTIONS:
   -p, --port PORT         Server port (default: 8000)
   -H, --host HOST         Bind host (default: 0.0.0.0)
-  -tp, --tp N             Tensor parallel size (default: 6)
+  -tp, --tp N             Tensor parallel size (default: 1)
   -gmu, --gpu-mem-util F  GPU memory utilization (default: 0.87)
   -mml, --max-model-len N Max model context length (default: 4096)
   -mns, --max-num-seqs N  Max concurrent sequences (default: 256)
@@ -39,8 +44,8 @@ ENV OVERRIDES:
 
 EXAMPLES:
   $(basename "$0")                                              # Defaults (qwen2.5-0.6b, TP=1)
-  $(basename "$0") -tp 1 -gmu 0.90 models/hf/llama3.1-8b      # Single GPU, 8B
-  $(basename "$0") -p 8000 -tp 6 -q awq                        # AWQ quantization
+  $(basename "$0") -gmu 0.87 /workspace/models/hf/llama3.1-8b  # Single GPU, 8B
+  $(basename "$0") -tp 6 -q awq                                # 6-GPU AWQ
   $(basename "$0") --no-prefix-cache --no-chunked-prefill       # Baseline (no cache)
 EOF
     exit 0
@@ -49,7 +54,7 @@ EOF
 MODEL=""
 PORT="${VLLM_PORT:-8000}"
 HOST="${VLLM_HOST:-0.0.0.0}"
-TP="${VLLM_TP:-6}"
+TP="${VLLM_TP:-1}"
 GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.87}"
 MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-4096}"
 MAX_NUM_SEQS="${VLLM_MAX_NUM_SEQS:-256}"
@@ -85,6 +90,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 MODEL="${MODEL:-$DEFAULT_MODEL}"
+if [[ -z "$MODEL" ]]; then
+    echo "ERROR: No model specified. Set VLLM_MODEL env var or pass model path." >&2
+    echo "Usage: $0 [OPTIONS] [MODEL_PATH]" >&2
+    exit 1
+fi
 
 GPU_NAME="N/A"
 GPU_COUNT=0
@@ -137,7 +147,4 @@ exec vllm serve "$MODEL" \
     $PREFIX_CACHE \
     $CHUNKED_PREFILL \
     --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
-    --enable-metrics \
-    --metrics-port "$METRICS_PORT" \
-    --swap-space "$SWAP_SPACE" \
     $TRUST_REMOTE

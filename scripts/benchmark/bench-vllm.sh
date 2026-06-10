@@ -4,11 +4,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
 BASE_URL="${VLLM_BENCH_URL:-http://localhost:8000}"
-MODEL="${VLLM_BENCH_MODEL:-models/hf/qwen2.5-0.6b}"
+MODEL="${VLLM_BENCH_MODEL:-}"
+if [[ -z "$MODEL" ]]; then
+    echo "ERROR: No model specified. Set VLLM_BENCH_MODEL env var." >&2
+    exit 1
+fi
 RESULTS_DIR="${VLLM_RESULTS_DIR:-${PROJECT_ROOT}/results/vllm}"
 DATASET="${VLLM_BENCH_DATASET:-sharegpt}"
-DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-${PROJECT_ROOT}/datasets/sharegpt.json}"
+DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-}"
 VLLM_BIN="${VLLM_BIN:-$(command -v vllm 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/vllm")}"
 
 usage() {
