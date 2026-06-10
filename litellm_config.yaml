@@ -1,46 +1,29 @@
 model_list:
-  # vLLM (port 8000)
-  - model_name: qwen0.5b-vllm
-    litellm_params:
-      model: openai//workspace/models/hf/qwen2.5-0.6b
-      api_base: http://localhost:8000/v1
-      api_key: EMPTY
-
-  # llama-cpp-turboquant (port 8001)
-  - model_name: qwen0.5b-llamacpp
-    litellm_params:
-      model: openai/qwen2.5-0.5b-instruct-q4_k_m.gguf
-      api_base: http://localhost:8001/v1
-      api_key: EMPTY
-
-  # SGLang (port 8002)
-  # - model_name: qwen35b-sglang
-  #   litellm_params:
-  #     model: openai/Qwen3.6-35B-A3B
-  #     api_base: http://localhost:8002/v1
-  #     api_key: EMPTY
-
-  # Embedding model (llama-cpp-turboquant on port 8003)
-  - model_name: embedding-model
-    litellm_params:
-      model: openai/Qwen3-Embedding-0.6B-Q8_0
-      api_base: http://localhost:8003/v1
-      api_key: EMPTY
-
-# Load Balancer routing
+- model_name: embedding-model
+  litellm_params:
+    model: openai/Qwen3-Embedding-0.6B-Q8_0.gguf
+    api_base: http://localhost:8001/v1
+    api_key: EMPTY
+- model_name: qwen0.5b-vllm
+  litellm_params:
+    model: openai/models/hf/qwen2.5-0.6b
+    api_base: http://localhost:8000/v1
+    api_key: EMPTY
+- model_name: qwen0.5b-llamacpp
+  litellm_params:
+    model: openai/qwen2.5-0.5b-instruct-q4_k_m.gguf
+    api_base: http://localhost:8001/v1
+    api_key: EMPTY
 router_settings:
   routing_strategy: least-busy
-
 litellm_settings:
   set_verbose: false
   num_retries: 2
   request_timeout: 120
-  success_callback: ["prometheus"]
-  failure_callback: ["prometheus"]
-
-  # Cache: basic Redis (no RediSearch needed)
-  # Switch to redis-semantic after installing Redis Stack:
-  #   sudo apt-get install redis-stack-server
+  success_callback:
+  - prometheus
+  failure_callback:
+  - prometheus
   cache: true
   cache_params:
     type: redis
