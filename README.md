@@ -1,153 +1,156 @@
 # GPU Cluster Benchmarking
 
-LLM Self-Hosted Benchmark & Deployment — 6× NVIDIA A40 · vLLM · llama.cpp · SGLang
+LLM Self-Hosted Benchmark & Deployment — vLLM · llama-cpp-turboquant · SGLang
+
+## Port Reference
+
+| Service | Port | Protocol |
+|---------|------|----------|
+| vLLM API | 8000 | HTTP |
+| llama-cpp-turboquant API | 8001 | HTTP |
+| SGLang API | 8002 | HTTP |
+| Embedding Server | 8003 | HTTP |
+| LiteLLM Proxy | 4000 | HTTP |
+| Redis | 6379 | TCP |
 
 ## Project Structure
 
 ```
 gpu-cluster-benchmarking/
-├── third_party/
-│   └── llama.cpp/          # Git submodule (C++ source, built via CMake)
+├── third_party/                     # Git submodules
+│   ├── vllm/
+│   ├── sglang/
+│   └── llama-cpp-turboquant/        # llama.cpp with TurboQuant KV cache
 ├── scripts/
-│   └── build-llamacpp.sh   # CMake build script for llama.cpp
-├── pyproject.toml           # uv dependency groups per framework
-└── benchmark_plan.md
+│   ├── run/                         # Start serving frameworks
+│   │   ├── run-vllm.sh              # vLLM server (port 8000)
+│   │   ├── run-sglang.sh            # SGLang server (port 8002)
+│   │   ├── run-llamacpp.sh          # llama-cpp-turboquant (port 8001)
+│   │   ├── run-embedding-server.sh  # Embedding server (port 8003)
+│   │   └── run-proxy.sh             # LiteLLM proxy (port 4000)
+│   ├── benchmark/                   # Benchmark runners
+│   │   ├── bench-vllm.sh            # vLLM: vllm bench serve
+│   │   ├── bench-sglang.sh          # SGLang: sglang.bench_serving
+│   │   ├── bench-llamacpp.sh        # llama.cpp: direct HTTP tests
+│   │   ├── bench-litellm.sh         # LiteLLM async/locust
+│   │   ├── bench-litellm-async.py
+│   │   └── bench-litellm-locust.py
+│   ├── build/                       # Build from source
+│   │   ├── build-llamacpp-turbo.sh  # Build llama-cpp-turboquant
+│   │   ├── build-vllm.sh
+│   │   └── build-sglang.sh
+│   ├── download-models.py           # Batch download from HuggingFace
+│   ├── run-all-benchmarks.sh        # Master benchmark runner
+│   ├── run-pipeline.sh              # Full pipeline: download → bench → report
+│   ├── report.py                    # Generate formatted report (CSV + markdown)
+│   ├── parse-results.py             # Aggregate results → CSV
+│   ├── monitor-gpu.sh               # Real-time GPU monitoring
+│   ├── init-bare-machine.sh         # Bare metal setup
+│   ├── docker/
+│   │   └── start.sh                 # Container entrypoint (RunPod)
+│   └── test/
+│       ├── test-llm.sh              # Test LLM endpoints
+│       └── test-proxy.sh            # Test LiteLLM proxy
+├── configs/
+│   └── models.yaml                  # Model download config
+├── docs/                            # Documentation
+│   ├── setup.md                     # Environment setup
+│   ├── build.md                     # Build llama-cpp-turboquant
+│   ├── run.md                       # Start servers (all params)
+│   ├── download-models.md           # Download models
+│   ├── benchmark.md                 # Run benchmarks (all params)
+│   └── config.md                    # Config files reference
+├── pyproject.toml                   # uv dependency groups
+├── litellm_config.yaml              # LiteLLM proxy config
+├── .env                             # Environment variables
+├── Dockerfile.serving               # Docker image (vLLM + llama-cpp-turboquant)
+├── run_pod_cloud.md                 # RunPod deployment guide
+└── benchmark_plan.md                # Benchmark strategy
 ```
-
-**Serving frameworks are separate:**
-- **vLLM** / **SGLang** — Python packages, installed via `uv sync`
-- **llama.cpp** — C++ submodule, compiled via CMake into `third_party/llama.cpp/build/bin/`
-
-## Environment Setup with uv
-
-Install [uv](https://docs.astral.sh/uv/) first:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-### 1. Clone with submodules
-
-```bash
-git clone --recurse-submodules <repo-url>
-cd gpu-cluster-benchmarking
-
-# Or if already cloned:
-git submodule update --init --depth 1
-```
-
-### 2. Sync by Serving Framework
-
-Each serving framework has its own dependency group. Install only what you need:
-
-```bash
-# Common deps only (huggingface-hub, aiohttp, pandas, numpy, etc.)
-uv sync
-
-# vLLM
-uv sync --group vllm
-
-# SGLang
-uv sync --group sglang
-
-# llama.cpp Python scripts (GGUF conversion utilities)
-uv sync --group llamacpp
-
-# Multiple frameworks
-uv sync --group vllm --group sglang
-
-# Benchmark tools (locust, llama-benchy)
-uv sync --group benchmark
-
-# LiteLLM proxy + caching
-uv sync --group litellm
-
-# Monitoring (prometheus-client, psutil, gputil)
-uv sync --group monitoring
-
-# Everything
-uv sync --group all
-```
-
-### 3. Build llama.cpp (C++ binary)
-
-llama.cpp is a C++ project — build it separately with the provided script:
-
-```bash
-# Build with CUDA (default: A40 arch 86, all CPU cores)
-./scripts/build-llamacpp.sh
-
-# Custom CUDA architecture (e.g. A100 = 80, H100 = 90)
-CUDA_ARCH=80 ./scripts/build-llamacpp.sh
-
-# Binary location after build:
-# third_party/llama.cpp/build/bin/llama-server
-# third_party/llama.cpp/build/bin/llama-cli
-```
-
-### Run Serving Frameworks
-
-```bash
-# vLLM (Python — port 8000)
-uv run --group vllm python -m vllm.entrypoints.openai.api_server \
-  --model /workspace/models/hf/qwen2.5-32b-awq --tensor-parallel-size 6 --port 8000
-
-# SGLang (Python — port 8002)
-uv run --group sglang python -m sglang.launch_server \
-  --model-path /workspace/models/hf/qwen2.5-32b-awq --tp 6 --port 8002
-
-# llama.cpp (C++ binary — port 8001)
-./third_party/llama.cpp/build/bin/llama-server \
-  -m /workspace/models/gguf/qwen2.5-32b-instruct-q4_k_m.gguf \
-  --host 0.0.0.0 --port 8001
-
-# LiteLLM proxy
-uv run --group litellm litellm --config litellm_config.yaml --port 4000
-```
-
-## Dependency Groups Reference
-
-| Group | Packages | Purpose |
-|-------|----------|---------|
-| `common` | huggingface-hub, aiohttp, pandas, numpy, tqdm, transformers, prometheus-client, psutil, gputil, redis | Base utilities & monitoring |
-| `vllm` | vllm>=0.8.0 | PagedAttention + Continuous Batching + Prefix Caching |
-| `sglang` | sglang[all]>=0.5.0, flashinfer-python | RadixAttention + Chunk Prefill + FlashInfer |
-| `llamacpp` | third_party/llama.cpp (submodule, CMake build) | GGUF quantization with CUDA backend |
-| `benchmark` | locust, llama-benchy, aiohttp, pandas, numpy, tqdm, transformers | Load testing & benchmark tools |
-| `litellm` | litellm[proxy]>=1.40.0, redis | API gateway + semantic cache |
-| `monitoring` | prometheus-client, psutil, gputil | GPU & system metrics collection |
-| `all` | (all groups above) | Full install |
 
 ## Quick Start
 
 ```bash
-# Clone with submodules
+# 1. Setup
+curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone --recurse-submodules <repo-url> && cd gpu-cluster-benchmarking
+uv sync --group common --group benchmark --group litellm --group monitoring
 
-# Install Python deps
-uv sync --group all
+# 2. Build llama-cpp-turboquant
+./scripts/build/build-llamacpp-turbo.sh
 
-# Build llama.cpp
-./scripts/build-llamacpp.sh
+# 3. Start Redis
+redis-server --daemonize yes
 
-# Download models
-uv run huggingface-cli download Qwen/Qwen2.5-32B-Instruct-AWQ \
-  --local-dir /workspace/models/hf/qwen2.5-32b-awq
+# 4. Start servers (each in separate tmux)
+uv run ./scripts/run/run-llamacpp.sh                         # port 8001
+uv run ./scripts/run/run-vllm.sh                              # port 8000
+uv run ./scripts/run/run-sglang.sh                            # port 8002
+uv run ./scripts/run/run-embedding-server.sh                  # port 8003
+OPENAI_API_BASE=http://localhost:8003/v1 OPENAI_API_KEY=EMPTY \
+    uv run ./scripts/run/run-proxy.sh                         # port 4000
 
-# Start serving (each in a separate tmux session)
-uv run --group vllm python -m vllm.entrypoints.openai.api_server \
-  --model /workspace/models/hf/qwen2.5-32b-awq --tensor-parallel-size 6 --port 8000
+# 5. Run benchmarks
+uv run ./scripts/benchmark/bench-llamacpp.sh                  # llama.cpp
+uv run ./scripts/benchmark/bench-vllm.sh -p p1                # vLLM
+uv run ./scripts/benchmark/bench-sglang.sh -p p1              # SGLang
+uv run ./scripts/run-all-benchmarks.sh                        # all frameworks
 
-uv run --group sglang python -m sglang.launch_server \
-  --model-path /workspace/models/hf/qwen2.5-32b-awq --tp 6 --port 8002
-
-./third_party/llama.cpp/build/bin/llama-server \
-  -m /workspace/models/gguf/qwen2.5-32b-instruct-q4_k_m.gguf --port 8001
-
-# Run benchmarks
-uv run --group benchmark python benchmarks/benchmark_serving.py \
-  --backend openai-chat --base-url http://localhost:8000 \
-  --model /workspace/models/hf/qwen2.5-32b-awq \
-  --dataset-name sharegpt --dataset-path /workspace/datasets/sharegpt.json \
-  --num-prompts 100 --max-concurrency 8
+# 6. Full pipeline (download → bench → parse)
+uv run ./scripts/run-pipeline.sh --only-download              # download models
+uv run ./scripts/run-pipeline.sh --skip-download              # benchmark only
 ```
+
+## Download Models
+
+```bash
+# Edit configs/models.yaml to enable models, then:
+uv run python scripts/download-models.py
+uv run python scripts/download-models.py --dir /path/to/models
+uv run python scripts/download-models.py --only qwen7b-gguf
+uv run python scripts/download-models.py --dry-run
+```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/setup.md](docs/setup.md) | Install uv, clone, deps, Redis |
+| [docs/build.md](docs/build.md) | Build llama-cpp-turboquant from source |
+| [docs/run.md](docs/run.md) | Start servers — all params for each framework |
+| [docs/download-models.md](docs/download-models.md) | Download models from HuggingFace |
+| [docs/benchmark.md](docs/benchmark.md) | Run benchmarks — params, pipeline, results |
+| [docs/config.md](docs/config.md) | Config files, env vars, options reference |
+
+## Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/run/run-llamacpp.sh` | Start llama-cpp-turboquant (TurboQuant KV cache) |
+| `scripts/run/run-vllm.sh` | Start vLLM (prefix caching + chunked prefill) |
+| `scripts/run/run-sglang.sh` | Start SGLang (RadixAttention + torch.compile) |
+| `scripts/run/run-embedding-server.sh` | Start embedding server for semantic cache |
+| `scripts/run/run-proxy.sh` | Start LiteLLM proxy with Redis cache |
+| `scripts/benchmark/bench-llamacpp.sh` | llama.cpp benchmark (single/concurrent/long context) |
+| `scripts/benchmark/bench-vllm.sh` | vLLM benchmark (vllm bench serve) |
+| `scripts/benchmark/bench-sglang.sh` | SGLang benchmark (sglang.bench_serving) |
+| `scripts/benchmark/bench-litellm.sh` | LiteLLM async/locust load test |
+| `scripts/run-all-benchmarks.sh` | Master runner — all frameworks sequentially |
+| `scripts/run-pipeline.sh` | Full pipeline: download → benchmark → parse |
+| `scripts/parse-results.py` | Aggregate JSON → CSV summary |
+| `scripts/report.py` | Generate formatted report (terminal + CSV + markdown) |
+| `scripts/monitor-gpu.sh` | Real-time GPU monitoring with CSV logging |
+| `scripts/download-models.py` | Config-driven HuggingFace batch download |
+
+## Dependency Groups
+
+| Group | Packages | Purpose |
+|-------|----------|---------|
+| `common` | huggingface-hub, aiohttp, pandas, numpy, tqdm, transformers, prometheus-client, psutil, gputil, redis | Base utilities & monitoring |
+| `vllm` | vllm (from source) | PagedAttention + Continuous Batching |
+| `sglang` | sglang (from source) | RadixAttention + Chunk Prefill + FlashInfer |
+| `benchmark` | locust, aiohttp, pandas, numpy, tqdm, transformers | Load testing tools |
+| `litellm` | litellm[proxy]>=1.40.0, redis, redisvl | API gateway + semantic cache |
+| `monitoring` | prometheus-client, psutil, gputil | GPU & system metrics |
+
+**Note:** `vllm` and `sglang` groups conflict — cannot install both in the same environment.
