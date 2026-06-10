@@ -84,6 +84,7 @@ ARG CMAKE_JOBS=8
 COPY third_party/llama.cpp /src
 
 # Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
+# BUILD_SHARED_LIBS left at default (ON) — matches scripts/build/build-llamacpp.sh
 RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
     && cmake -B /build -S /src \
         -DCMAKE_BUILD_TYPE=Release \
@@ -103,6 +104,7 @@ ARG CMAKE_JOBS=8
 COPY third_party/llama-cpp-turboquant /src
 
 # Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
+# BUILD_SHARED_LIBS left at default (ON) — matches scripts/build/build-llamacpp-turbo.sh
 RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
     && cmake -B /build -S /src \
         -DCMAKE_BUILD_TYPE=Release \
@@ -186,28 +188,37 @@ RUN uv pip install --system --break-system-packages \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu126
 
-# ── llama.cpp Binaries ────────────────────────────────────────
+# ── llama.cpp Binaries + Shared Libraries ─────────────────────
 COPY --from=llamacpp-build   /build/bin/llama-server /usr/local/bin/llama-server
 COPY --from=llamacpp-build   /build/bin/llama-bench  /usr/local/bin/llama-bench
 COPY --from=turboquant-build /build/bin/llama-server /usr/local/bin/llama-server-turbo
 COPY --from=turboquant-build /build/bin/llama-bench  /usr/local/bin/llama-bench-turbo
+COPY --from=llamacpp-build   /build/bin/*.so*        /usr/local/lib/
+COPY --from=turboquant-build /build/bin/*.so*        /usr/local/lib/
+RUN ldconfig
 
 # ── vLLM venv ─────────────────────────────────────────────────
 RUN uv venv --seed --python "${PYTHON_VERSION}" /opt/venvs/vllm
 
-COPY third_party/vllm /tmp/third_party/vllm
+# Copy dependency specs first (cache layer — only invalidated when deps change)
+COPY third_party/vllm/pyproject.toml \
+     third_party/vllm/setup.py \
+     third_party/vllm/requirements/build/cuda.txt \
+     /tmp/third_party/vllm/
+
+COPY third_party/vllm/requirements/common.txt \
+     /tmp/third_party/vllm/requirements/common.txt
 
 RUN . /opt/venvs/vllm/bin/activate \
     && pip install --upgrade pip setuptools wheel \
     && pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu126 \
-    && pip install \
-        ninja \
-        packaging \
-        "setuptools>=77.0.3,<81.0.0" \
-        setuptools-scm \
-        setuptools-rust \
-        jinja2 \
-        cmake \
+    && pip install -r /tmp/third_party/vllm/requirements/build/cuda.txt \
+    && pip cache purge
+
+# Copy full source and build (invalidated on any vllm source change)
+COPY third_party/vllm /tmp/third_party/vllm
+
+RUN . /opt/venvs/vllm/bin/activate \
     && cd /tmp/third_party/vllm \
     && MAX_JOBS=${MAX_JOBS} pip install --no-build-isolation . \
     && pip cache purge \
@@ -216,7 +227,9 @@ RUN . /opt/venvs/vllm/bin/activate \
 # ── SGLang venv ───────────────────────────────────────────────
 RUN uv venv --seed --python "${PYTHON_VERSION}" /opt/venvs/sglang
 
-COPY third_party/sglang /tmp/third_party/sglang
+# Copy dependency specs first (cache layer)
+COPY third_party/sglang/python/pyproject.toml \
+     /tmp/third_party/sglang/python/pyproject.toml
 
 RUN . /opt/venvs/sglang/bin/activate \
     && pip install --upgrade pip setuptools wheel \
@@ -225,6 +238,12 @@ RUN . /opt/venvs/sglang/bin/activate \
         "setuptools>=61.0" \
         setuptools-scm \
         setuptools-rust \
+    && pip cache purge
+
+# Copy full source and build
+COPY third_party/sglang /tmp/third_party/sglang
+
+RUN . /opt/venvs/sglang/bin/activate \
     && cd /tmp/third_party/sglang/python \
     && pip install --no-build-isolation . \
     && pip cache purge \
