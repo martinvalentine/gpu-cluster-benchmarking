@@ -4,6 +4,9 @@ set -Eeuo pipefail
 log_info()  { echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO:  $*"; }
 log_warn()  { echo "[$(date +'%Y-%m-%d %H:%M:%S')] WARN:  $*" >&2; }
 
+# ── Workspace (after volume mount) ─────────────────────────────
+mkdir -p /workspace/{models/hf,models/gguf,datasets,results,logs}
+
 # ── Redis ──────────────────────────────────────────────────────
 if ! redis-cli ping &>/dev/null; then
     log_info "Starting Redis..."
@@ -35,10 +38,9 @@ log_info " LLM Serving Base Image Ready"
 log_info "=========================================="
 log_info ""
 log_info "Frameworks:"
-log_info "  vLLM:       /opt/venvs/vllm/bin/vllm"
-log_info "  SGLang:     /opt/venvs/sglang/bin/python -m sglang"
-log_info "  llama.cpp:  llama-server"
-log_info "  turboquant: llama-server-turbo"
+[ -x /opt/venvs/vllm/bin/vllm ] && log_info "  vLLM:       /opt/venvs/vllm/bin/vllm"
+[ -x /usr/local/bin/llama-server ] && log_info "  llama.cpp:  llama-server"
+[ -x /usr/local/bin/llama-bench ] && log_info "  turboquant: llama-server-turbo"
 log_info ""
 log_info "GPU:"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null || log_warn "nvidia-smi not available."
@@ -47,8 +49,4 @@ log_info "Workspace: /workspace"
 log_info "=========================================="
 
 # ── Execute ────────────────────────────────────────────────────
-if [ $# -eq 0 ]; then
-    exec bash
-else
-    exec "$@"
-fi
+exec "$@"

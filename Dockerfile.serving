@@ -57,11 +57,11 @@ COPY --from=turboquant-build /build/bin/llama-bench  /usr/local/bin/llama-bench
 COPY --from=turboquant-build /build/bin/*.so*        /usr/local/lib/
 RUN ldconfig
 
-# SSH + Redis + workspace
+# SSH + Redis
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssh-server redis-server \
+    openssh-server redis-server curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /run/sshd /root/.ssh /workspace/{models,datasets,results,logs} \
+    && mkdir -p /run/sshd /root/.ssh \
     && chmod 700 /root/.ssh
 
 COPY scripts/docker/start.sh /app/start.sh
@@ -75,3 +75,4 @@ EXPOSE 22 6379 8000 8001 8003 30000
 WORKDIR /workspace
 
 ENTRYPOINT ["/app/start.sh"]
+CMD ["sleep", "infinity"]
