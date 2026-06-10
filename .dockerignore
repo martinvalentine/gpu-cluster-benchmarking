@@ -1,0 +1,49 @@
+# ── Git ────────────────────────────────────────────────────────
+.git
+.gitmodules
+
+# ── Python ─────────────────────────────────────────────────────
+.venv
+__pycache__/
+*.py[codz]
+*$py.class
+*.egg-info/
+*.egg
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+
+# ── Build artifacts ────────────────────────────────────────────
+build/
+dist/
+*.whl
+*.so
+*.o
+*.a
+
+# ── Project-specific (NOT needed in image) ─────────────────────
+results/
+logs/
+benchmark/
+src/
+configs/
+scripts/benchmark/
+scripts/run/
+scripts/test/
+
+# ── IDE / Editor ───────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── CI / DevOps ────────────────────────────────────────────────
+.github/
+.buildkite/
+
+# ── Documentation (not needed in image) ────────────────────────
+*.md
+!third_party/**/*.md
+LICENSE
