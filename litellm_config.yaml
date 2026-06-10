@@ -1,32 +1,31 @@
 model_list:
-  # llama-cpp-turboquant (port 8001)
-  - model_name: qwen35b-llamacpp
-    litellm_params:
-      model: openai/Qwen3.6-35B-A3B-UDT-Q5_K_XL_MTP
-      api_base: http://localhost:8001/v1
-      api_key: EMPTY
-
   # vLLM (port 8000)
-  - model_name: qwen35b-vllm
+  - model_name: qwen0.5b-vllm
     litellm_params:
-      model: openai/Qwen3.6-35B-A3B
+      model: openai//workspace/models/hf/qwen2.5-0.6b
       api_base: http://localhost:8000/v1
       api_key: EMPTY
 
-  # SGLang (port 8002)
-  - model_name: qwen35b-sglang
+  # llama-cpp-turboquant (port 8001)
+  - model_name: qwen0.5b-llamacpp
     litellm_params:
-      model: openai/Qwen3.6-35B-A3B
-      api_base: http://localhost:8002/v1
+      model: openai/qwen2.5-0.5b-instruct-q4_k_m.gguf
+      api_base: http://localhost:8001/v1
       api_key: EMPTY
 
-  # Embedding model for semantic cache (llama-cpp-turboquant on port 8003)
-  # Uncomment when Redis Stack (with RediSearch) is installed:
-  # - model_name: embedding-model
+  # SGLang (port 8002)
+  # - model_name: qwen35b-sglang
   #   litellm_params:
-  #     model: openai/embedding-model
-  #     api_base: http://localhost:8003/v1
+  #     model: openai/Qwen3.6-35B-A3B
+  #     api_base: http://localhost:8002/v1
   #     api_key: EMPTY
+
+  # Embedding model (llama-cpp-turboquant on port 8003)
+  - model_name: embedding-model
+    litellm_params:
+      model: openai/Qwen3-Embedding-0.6B-Q8_0
+      api_base: http://localhost:8003/v1
+      api_key: EMPTY
 
 # Load Balancer routing
 router_settings:
