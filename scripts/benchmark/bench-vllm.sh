@@ -92,6 +92,14 @@ run_bench() {
     echo ""
 }
 
+if [[ "$PHASE" == "all" || "$PHASE" == "p0" ]]; then
+    echo "--- Phase P0: Smoke Test ---"
+    for CONC in 1 4; do
+        run_bench "p0_smoke" "$MODEL" "$CONC"
+        sleep 3
+    done
+fi
+
 if [[ "$PHASE" == "all" || "$PHASE" == "p1" ]]; then
     echo "--- Phase P1: Light Load ---"
     for CONC in 1 32 64 128; do

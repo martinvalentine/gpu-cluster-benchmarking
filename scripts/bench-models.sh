@@ -173,8 +173,17 @@ start_vllm() {
 
     kill_server_on_port "$port"
 
+    local vllm_bin="${PROJECT_ROOT}/.venv/bin/vllm"
+    if [[ ! -f "$vllm_bin" ]]; then
+        vllm_bin=$(command -v vllm 2>/dev/null || true)
+    fi
+    if [[ -z "$vllm_bin" || ! -f "$vllm_bin" ]]; then
+        fail "vllm binary not found (checked .venv/bin/vllm and PATH)"
+        return 1
+    fi
+
     tmux new-session -d -s "bench-vllm" -n "serve" \
-        "cd $PROJECT_ROOT && .venv/bin/vllm serve $model_path \
+        "VLLM_USE_FLASHINFER_SAMPLER=0 $vllm_bin serve $model_path \
             --host 0.0.0.0 --port $port \
             --tensor-parallel-size ${VLLM_TP:-1} \
             --gpu-memory-utilization ${VLLM_GPU_MEM_UTIL:-0.15} \
@@ -221,7 +230,7 @@ start_llamacpp() {
         "cd $PROJECT_ROOT && $llama_bin \
             -m $model_path \
             --host 0.0.0.0 --port $port \
-            -n 4 -c 4096 -ng all \
+            -n 4 -c 4096 -ngl 999 \
             2>&1 | tee /tmp/bench_llama.log; sleep infinity"
 
     log "  Waiting for llama.cpp to be ready..."
@@ -276,9 +285,8 @@ run_benchmark() {
         "$bench_script" -p "$PHASE" 2>&1 | tee -a "$LOG_FILE"
     elif [[ "$fw" == "llamacpp" ]]; then
         LLAMA_RESULTS_DIR="$results_dir" \
-        LITELLM_BENCH_URL="http://localhost:$port" \
-        LITELLM_BENCH_MODEL="$model_name" \
-        "$bench_script" -p "$PHASE" 2>&1 | tee -a "$LOG_FILE"
+        LLAMA_BENCH_URL="http://localhost:$port/v1" \
+        "$bench_script" 2>&1 | tee -a "$LOG_FILE"
     fi
 }
 
