@@ -4,6 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
 BASE_URL="${LITELLM_BENCH_URL:-http://localhost:4000}"
 MODEL="${LITELLM_BENCH_MODEL:-qwen0.5b-llamacpp}"
 RESULTS_DIR="${LITELLM_RESULTS_DIR:-${PROJECT_ROOT}/results/litellm}"
