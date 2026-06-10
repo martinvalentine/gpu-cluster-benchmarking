@@ -17,6 +17,16 @@
 # Build (default — A40 / RTX 3090):
 #   docker build -t llm-serving-base:latest .
 #
+# Build (tune parallelism for your machine):
+#   docker build --build-arg MAX_JOBS=4 --build-arg NVCC_THREADS=4 --build-arg CMAKE_JOBS=8 -t llm-serving-base:latest .
+#
+# Build Args Reference:
+#   CUDA_ARCH     — GPU compute capability (default: 8.6 = A40)
+#   MAX_JOBS      — Ninja parallel jobs for vLLM/SGLang C++ extensions (default: 4)
+#   NVCC_THREADS  — Threads per nvcc invocation (default: 4)
+#   CMAKE_JOBS    — Parallel jobs for llama.cpp cmake builds (default: 8)
+#   PYTHON_VERSION — Python version (default: 3.12)
+#
 # Build (other GPUs):
 #   docker build --build-arg CUDA_ARCH="8.0" -t myimage:latest .    # A100
 #   docker build --build-arg CUDA_ARCH="8.9" -t myimage:latest .    # RTX 4090 / Ada
@@ -69,6 +79,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM cpp-build-base AS llamacpp-build
 
 ARG CUDA_ARCH=8.6
+ARG CMAKE_JOBS=8
 
 COPY third_party/llama.cpp /src
 
@@ -79,7 +90,7 @@ RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
         -DGGML_CUDA_GRAPHS=ON \
-    && cmake --build /build --config Release -j"$(nproc)"
+    && cmake --build /build --config Release -j"${CMAKE_JOBS}"
 
 # ============================================================
 # STAGE 3 — Build llama-cpp-turboquant
@@ -87,6 +98,7 @@ RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
 FROM cpp-build-base AS turboquant-build
 
 ARG CUDA_ARCH=8.6
+ARG CMAKE_JOBS=8
 
 COPY third_party/llama-cpp-turboquant /src
 
@@ -97,7 +109,7 @@ RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
         -DGGML_CUDA_GRAPHS=ON \
-    && cmake --build /build --config Release -j"$(nproc)"
+    && cmake --build /build --config Release -j"${CMAKE_JOBS}"
 
 # ============================================================
 # STAGE 4 — Runtime Image
@@ -107,11 +119,13 @@ FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS runtime
 ARG PYTHON_VERSION=3.12
 ARG CUDA_ARCH=8.6
 ARG MAX_JOBS=4
+ARG NVCC_THREADS=4
 
 ENV DEBIAN_FRONTEND=noninteractive
 # TORCH_CUDA_ARCH_LIST uses PyTorch format: "8.0 8.6 8.9" (space-separated, with dot)
 ENV TORCH_CUDA_ARCH_LIST="${CUDA_ARCH}"
 ENV MAX_JOBS=${MAX_JOBS}
+ENV NVCC_THREADS=${NVCC_THREADS}
 ENV CUDA_HOME=/usr/local/cuda
 
 # ── System Dependencies ───────────────────────────────────────
@@ -159,9 +173,7 @@ ENV UV_CACHE_DIR="/opt/uv/cache"
 ENV PATH="${UV_INSTALL_DIR}:${PATH}"
 
 RUN mkdir -p "${UV_INSTALL_DIR}" "${UV_CACHE_DIR}" \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && mv /root/.local/bin/uv "${UV_INSTALL_DIR}/uv" \
-    && chmod +x "${UV_INSTALL_DIR}/uv"
+    && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # ── Rust (needed for vLLM / SGLang setuptools-rust) ───────────
 ENV PATH="/root/.cargo/bin:${PATH}"
