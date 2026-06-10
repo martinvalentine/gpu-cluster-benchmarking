@@ -1,38 +1,32 @@
 model_list:
-  # llama.cpp endpoint (port 8001)
+  # llama-cpp-turboquant (port 8001)
   - model_name: qwen35b-llamacpp
     litellm_params:
       model: openai/Qwen3.6-35B-A3B-UDT-Q5_K_XL_MTP
       api_base: http://localhost:8001/v1
       api_key: EMPTY
 
-  # llama.cpp TurboQuant endpoint (port 8002)
-  - model_name: qwen35b-llamacpp-turbo
+  # vLLM (port 8000)
+  - model_name: qwen35b-vllm
     litellm_params:
-      model: openai/Qwen3.6-35B-A3B-UDT-Q5_K_XL_MTP
+      model: openai/Qwen3.6-35B-A3B
+      api_base: http://localhost:8000/v1
+      api_key: EMPTY
+
+  # SGLang (port 8002)
+  - model_name: qwen35b-sglang
+    litellm_params:
+      model: openai/Qwen3.6-35B-A3B
       api_base: http://localhost:8002/v1
       api_key: EMPTY
 
-  # Uncomment when vLLM/SGLang run scripts are available:
-  # - model_name: qwen35b-vllm
+  # Embedding model for semantic cache (llama-cpp-turboquant on port 8003)
+  # Uncomment when Redis Stack (with RediSearch) is installed:
+  # - model_name: embedding-model
   #   litellm_params:
-  #     model: openai/Qwen3.6-35B-A3B
-  #     api_base: http://localhost:8000/v1
-  #     api_key: EMPTY
-  #
-  # - model_name: qwen35b-sglang
-  #   litellm_params:
-  #     model: openai/Qwen3.6-35B-A3B
+  #     model: openai/embedding-model
   #     api_base: http://localhost:8003/v1
   #     api_key: EMPTY
-
-  # Embedding model for semantic cache
-  # Requires OPENAI_API_KEY for text-embedding-3-small,
-  # or replace with a local embedding model served via vLLM/SGLang.
-  - model_name: embedding-model
-    litellm_params:
-      model: openai/text-embedding-3-small
-      api_key: os.environ/OPENAI_API_KEY
 
 # Load Balancer routing
 router_settings:
@@ -45,12 +39,12 @@ litellm_settings:
   success_callback: ["prometheus"]
   failure_callback: ["prometheus"]
 
-  # Semantic Cache with Redis
+  # Cache: basic Redis (no RediSearch needed)
+  # Switch to redis-semantic after installing Redis Stack:
+  #   sudo apt-get install redis-stack-server
   cache: true
   cache_params:
-    type: redis-semantic
+    type: redis
     host: localhost
     port: 6379
-    similarity_threshold: 0.95
     ttl: 3600
-    redis_semantic_cache_embedding_model: embedding-model
