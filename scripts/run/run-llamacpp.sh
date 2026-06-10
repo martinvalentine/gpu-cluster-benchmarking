@@ -6,7 +6,7 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 BINARY="${PROJECT_ROOT}/third_party/llama-cpp-turboquant/build/bin/llama-server"
 
-DEFAULT_MODEL="/home/metflow/AI-Infra/models/Qwen3.6-35B-A3B-UDT-Q5_K_XL_MTP.gguf"
+DEFAULT_MODEL="${LLAMA_MODEL:-}"
 
 usage() {
     cat <<EOF

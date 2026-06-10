@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 BINARY="${LLAMA_EMBED_BINARY:-third_party/llama-cpp-turboquant/build/bin/llama-server}"
-DEFAULT_MODEL="${LLAMA_EMBED_MODEL:-/home/metflow/AI-Infra/models/harrier-oss-v1-0.6B-Q8_0.gguf}"
+DEFAULT_MODEL="${LLAMA_EMBED_MODEL:-}"
 
 usage() {
     cat <<EOF
