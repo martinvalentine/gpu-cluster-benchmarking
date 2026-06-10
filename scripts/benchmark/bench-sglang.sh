@@ -4,12 +4,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
 BASE_URL="${SGLANG_BENCH_URL:-http://localhost:8002}"
-MODEL="${SGLANG_BENCH_MODEL:-models/hf/qwen2.5-0.6b}"
+MODEL="${SGLANG_BENCH_MODEL:-}"
+if [[ -z "$MODEL" ]]; then
+    echo "ERROR: No model specified. Set SGLANG_BENCH_MODEL env var." >&2
+    exit 1
+fi
 RESULTS_DIR="${SGLANG_RESULTS_DIR:-${PROJECT_ROOT}/results/sglang}"
 DATASET="${SGLANG_BENCH_DATASET:-sharegpt}"
-DATASET_PATH="${SGLANG_BENCH_DATASET_PATH:-${PROJECT_ROOT}/datasets/sharegpt.json}"
-SGLANG_BIN="${SGLANG_BIN:-$(command -v sglang 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/python3 -m sglang")}"
+DATASET_PATH="${SGLANG_BENCH_DATASET_PATH:-}"
+SGLANG_PYTHON="${SGLANG_PYTHON:-$(command -v python3 2>/dev/null || echo python3)}"
 
 usage() {
     cat <<EOF
@@ -92,7 +101,7 @@ run_bench() {
 
     echo "[$(date +%H:%M:%S)] SGLang ${phase_name} conc=${conc} num_prompts=${num_prompts}"
 
-    $SGLANG_BIN.bench_serving \
+    $SGLANG_PYTHON -m sglang.bench_serving \
         --backend sglang \
         --base-url "$BASE_URL" \
         --model "$model" \
@@ -110,8 +119,8 @@ run_bench() {
 
 # P1: Light Load — 8B model
 if [[ "$PHASE" == "all" || "$PHASE" == "p1" ]]; then
-    P1_MODEL="${SGLANG_P1_MODEL:-${PROJECT_ROOT}/models/hf/llama3.1-8b}"
-    echo "--- Phase P1: Light Load (8B) ---"
+    P1_MODEL="${SGLANG_P1_MODEL:-$MODEL}"
+    echo "--- Phase P1: Light Load (7B) ---"
     for CONC in 1 32 64 128; do
         run_bench "p1_light" "$P1_MODEL" "$CONC"
         sleep 5
@@ -120,7 +129,7 @@ fi
 
 # P2: Medium Load — 14B model
 if [[ "$PHASE" == "all" || "$PHASE" == "p2" ]]; then
-    P2_MODEL="${SGLANG_P2_MODEL:-${PROJECT_ROOT}/models/hf/qwen2.5-14b}"
+    P2_MODEL="${SGLANG_P2_MODEL:-$MODEL}"
     echo "--- Phase P2: Medium Load (14B) ---"
     for CONC in 1 16 32 64; do
         run_bench "p2_medium" "$P2_MODEL" "$CONC"

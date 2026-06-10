@@ -4,7 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-DEFAULT_MODEL="models/hf/qwen2.5-0.6b"
+# Load .env if exists (does not override existing env vars)
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+    set -a; source "${PROJECT_ROOT}/.env"; set +a
+fi
+
+DEFAULT_MODEL="${VLLM_MODEL:-}"
 
 usage() {
     cat <<EOF
@@ -47,12 +52,12 @@ EOF
 MODEL=""
 PORT="${SGLANG_PORT:-8002}"
 HOST="${SGLANG_HOST:-0.0.0.0}"
-TP="${SGLANG_TP:-6}"
+TP="${SGLANG_TP:-1}"
 MEM_FRAC="${SGLANG_MEM_FRAC:-0.87}"
 MAX_TOTAL_TOKENS="${SGLANG_MAX_TOTAL_TOKENS:-1048576}"
 CHUNKED_PS="${SGLANG_CHUNKED_PREFILL_SIZE:-8192}"
 ATTN_BACKEND="${SGLANG_ATTN_BACKEND:-flashinfer}"
-QUANT="${SGLANG_QUANT:-awq}"
+QUANT="${SGLANG_QUANT:-none}"
 MAX_RUNNING="${SGLANG_MAX_RUNNING:-256}"
 TORCH_COMPILE="--enable-torch-compile"
 RADIX_CACHE=""
@@ -80,6 +85,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 MODEL="${MODEL:-$DEFAULT_MODEL}"
+if [[ -z "$MODEL" ]]; then
+    echo "ERROR: No model specified. Set VLLM_MODEL env var or pass model path." >&2
+    echo "Usage: $0 [OPTIONS] [MODEL_PATH]" >&2
+    exit 1
+fi
 
 GPU_NAME="N/A"
 GPU_COUNT=0
