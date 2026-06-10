@@ -5,8 +5,7 @@
 # Architecture:
 #   /opt/venvs/vllm                     — vLLM virtualenv
 #   /opt/venvs/sglang                   — SGLang virtualenv
-#   /usr/local/bin/llama-server         — llama.cpp server
-#   /usr/local/bin/llama-server-turbo   — llama-cpp-turboquant server
+#   /usr/local/bin/llama-server         — llama-cpp-turboquant server (port 8001)
 #
 # NOT included (git clone at runtime):
 #   benchmark/, scripts/, configs/, results/
@@ -37,8 +36,7 @@
 #
 # Build (incremental — see guide):
 #   docker build --target cpp-build-base -t llm-base:cpp .
-#   docker build --target llamacpp-build -t llm-base:llamacpp .
-#   docker build --target turboquant-build -t llm-base:turboquant .
+#   docker build --target turboquant-build -t llm-base:turbo .
 #   docker build -t llm-serving-base:latest .
 #
 # Run:
@@ -63,7 +61,7 @@ ARG CUDA_VERSION=12.6.1
 ARG UBUNTU_VERSION=22.04
 
 # ============================================================
-# STAGE 1 — C++ Build Base (shared by llama.cpp stages)
+# STAGE 1 — C++ Build Base (for llama-cpp-turboquant)
 # ============================================================
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS cpp-build-base
 
@@ -73,28 +71,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# ============================================================
-# STAGE 2 — Build llama.cpp
-# ============================================================
-FROM cpp-build-base AS llamacpp-build
-
-ARG CUDA_ARCH=8.6
-ARG CMAKE_JOBS=8
-
-COPY third_party/llama.cpp /src
-
-# Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
-# BUILD_SHARED_LIBS left at default (ON) — matches scripts/build/build-llamacpp.sh
-RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
-    && cmake -B /build -S /src \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DGGML_CUDA=ON \
-        -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
-        -DGGML_CUDA_GRAPHS=ON \
-    && cmake --build /build --config Release -j"${CMAKE_JOBS}"
+# CUDA stubs for linking without host driver (libcuda.so lives in driver, not toolkit)
+ENV LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_PATH}
+RUN ln -sf /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so \
+           /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so.1
 
 # ============================================================
-# STAGE 3 — Build llama-cpp-turboquant
+# STAGE 2 — Build llama-cpp-turboquant
 # ============================================================
 FROM cpp-build-base AS turboquant-build
 
@@ -105,17 +89,23 @@ COPY third_party/llama-cpp-turboquant /src
 
 # Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
 # BUILD_SHARED_LIBS left at default (ON) — matches scripts/build/build-llamacpp-turbo.sh
+# LLAMA_BUILD_EXAMPLES/TESTS=OFF — only need server + bench, avoids linker errors
 RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
     && cmake -B /build -S /src \
         -DCMAKE_BUILD_TYPE=Release \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
         -DGGML_CUDA_GRAPHS=ON \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_TESTS=OFF \
     && cmake --build /build --config Release -j"${CMAKE_JOBS}"
 
 # ============================================================
-# STAGE 4 — Runtime Image
+# STAGE 3 — Runtime Image
 # ============================================================
+# MUST use devel (not runtime/base): vLLM and SGLang JIT-compile
+# CUDA kernels at runtime (FlashInfer, DeepGEMM, EP kernels).
+# They need nvcc which requires the full CUDA toolkit.
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS runtime
 
 ARG PYTHON_VERSION=3.12
@@ -129,6 +119,9 @@ ENV TORCH_CUDA_ARCH_LIST="${CUDA_ARCH}"
 ENV MAX_JOBS=${MAX_JOBS}
 ENV NVCC_THREADS=${NVCC_THREADS}
 ENV CUDA_HOME=/usr/local/cuda
+# setuptools-scm needs .git to detect version; Docker COPY strips it.
+# Pretend a version so build doesn't fail.
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0
 
 # ── System Dependencies ───────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -183,17 +176,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --profile minimal
 
-# ── PyTorch (system-wide Python) ──────────────────────────────
-RUN uv pip install --system --break-system-packages \
-    torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu126
-
-# ── llama.cpp Binaries + Shared Libraries ─────────────────────
-COPY --from=llamacpp-build   /build/bin/llama-server /usr/local/bin/llama-server
-COPY --from=llamacpp-build   /build/bin/llama-bench  /usr/local/bin/llama-bench
-COPY --from=turboquant-build /build/bin/llama-server /usr/local/bin/llama-server-turbo
-COPY --from=turboquant-build /build/bin/llama-bench  /usr/local/bin/llama-bench-turbo
-COPY --from=llamacpp-build   /build/bin/*.so*        /usr/local/lib/
+# ── llama-server (turboquant) + Shared Libraries ──────────────
+COPY --from=turboquant-build /build/bin/llama-server /usr/local/bin/llama-server
+COPY --from=turboquant-build /build/bin/llama-bench  /usr/local/bin/llama-bench
 COPY --from=turboquant-build /build/bin/*.so*        /usr/local/lib/
 RUN ldconfig
 
@@ -201,27 +186,24 @@ RUN ldconfig
 RUN uv venv --seed --python "${PYTHON_VERSION}" /opt/venvs/vllm
 
 # Copy dependency specs first (cache layer — only invalidated when deps change)
-COPY third_party/vllm/pyproject.toml \
-     third_party/vllm/setup.py \
-     third_party/vllm/requirements/build/cuda.txt \
-     /tmp/third_party/vllm/
-
-COPY third_party/vllm/requirements/common.txt \
-     /tmp/third_party/vllm/requirements/common.txt
+COPY third_party/vllm/requirements/ /tmp/third_party/vllm/requirements/
 
 RUN . /opt/venvs/vllm/bin/activate \
-    && pip install --upgrade pip setuptools wheel \
-    && pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu126 \
-    && pip install -r /tmp/third_party/vllm/requirements/build/cuda.txt \
-    && pip cache purge
+    && uv pip install --upgrade pip wheel \
+    && uv pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu126 \
+    && uv pip install numpy \
+    && uv pip install -r /tmp/third_party/vllm/requirements/build/cuda.txt \
+    && uv cache clean
 
 # Copy full source and build (invalidated on any vllm source change)
 COPY third_party/vllm /tmp/third_party/vllm
 
 RUN . /opt/venvs/vllm/bin/activate \
     && cd /tmp/third_party/vllm \
-    && MAX_JOBS=${MAX_JOBS} pip install --no-build-isolation . \
-    && pip cache purge \
+    && export MAX_JOBS=${MAX_JOBS} \
+    && export NVCC_THREADS=${NVCC_THREADS} \
+    && uv pip install --no-build-isolation . \
+    && uv cache clean \
     && rm -rf /tmp/third_party/vllm
 
 # ── SGLang venv ───────────────────────────────────────────────
@@ -232,26 +214,29 @@ COPY third_party/sglang/python/pyproject.toml \
      /tmp/third_party/sglang/python/pyproject.toml
 
 RUN . /opt/venvs/sglang/bin/activate \
-    && pip install --upgrade pip setuptools wheel \
-    && pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126 \
-    && pip install \
+    && uv pip install --upgrade pip wheel \
+    && uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126 \
+    && uv pip install numpy \
+    && uv pip install \
         "setuptools>=61.0" \
         setuptools-scm \
         setuptools-rust \
-    && pip cache purge
+    && uv cache clean
 
 # Copy full source and build
 COPY third_party/sglang /tmp/third_party/sglang
 
 RUN . /opt/venvs/sglang/bin/activate \
     && cd /tmp/third_party/sglang/python \
-    && pip install --no-build-isolation . \
-    && pip cache purge \
+    && export MAX_JOBS=${MAX_JOBS} \
+    && export NVCC_THREADS=${NVCC_THREADS} \
+    && uv pip install --no-build-isolation . \
+    && uv cache clean \
     && rm -rf /tmp/third_party/sglang
 
 # ── Cleanup ───────────────────────────────────────────────────
 RUN uv cache clean \
-    && rm -rf /root/.cache/pip /root/.cache/uv /tmp/third_party
+    && rm -rf /root/.cache/pip /tmp/third_party
 
 # ── Workspace ─────────────────────────────────────────────────
 RUN mkdir -p /workspace/{models/hf,models/gguf,datasets,results,logs} \
@@ -263,7 +248,7 @@ RUN mkdir -p /workspace/{models/hf,models/gguf,datasets,results,logs} \
 COPY scripts/docker/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-EXPOSE 22 6379 8000 8080 30000
+EXPOSE 22 6379 8000 8001 8003 30000
 
 WORKDIR /workspace
 
