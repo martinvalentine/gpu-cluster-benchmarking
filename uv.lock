@@ -2,14 +2,9 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 supported-markers = [
     "platform_machine == 'x86_64' and sys_platform == 'linux'",
@@ -319,11 +314,9 @@ name = "boto3"
 version = "1.43.25"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "botocore", version = "1.43.25", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -359,11 +352,9 @@ name = "botocore"
 version = "1.43.25"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "jmespath", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -899,11 +890,9 @@ name = "fastapi-sso"
 version = "0.21.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "fastapi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -1192,6 +1181,7 @@ all = [
     { name = "prometheus-client", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "psutil", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "redis", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "redisvl", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "tqdm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "transformers", version = "5.10.2", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -1225,6 +1215,7 @@ litellm = [
     { name = "litellm", version = "1.79.2", source = { registry = "https://pypi.org/simple" }, extra = ["proxy"], marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "litellm", version = "1.88.1", source = { registry = "https://pypi.org/simple" }, extra = ["proxy"], marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "redis", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "redisvl", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
 ]
 monitoring = [
     { name = "gputil", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -1253,6 +1244,7 @@ all = [
     { name = "prometheus-client" },
     { name = "psutil" },
     { name = "redis" },
+    { name = "redisvl" },
     { name = "tqdm" },
     { name = "transformers" },
 ]
@@ -1280,6 +1272,7 @@ common = [
 litellm = [
     { name = "litellm", extras = ["proxy"], specifier = ">=1.40.0" },
     { name = "redis" },
+    { name = "redisvl" },
 ]
 monitoring = [
     { name = "gputil" },
@@ -1679,6 +1672,15 @@ wheels = [
 ]
 
 [[package]]
+name = "jsonpath-ng"
+version = "1.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/32/58/250751940d75c8019659e15482d548a4aa3b6ce122c515102a4bfdac50e3/jsonpath_ng-1.8.0.tar.gz", hash = "sha256:54252968134b5e549ea5b872f1df1168bd7defe1a52fed5a358c194e1943ddc3", size = 74513, upload-time = "2026-02-24T14:42:06.182Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/99/33c7d78a3fb70d545fd5411ac67a651c81602cc09c9cf0df383733f068c5/jsonpath_ng-1.8.0-py3-none-any.whl", hash = "sha256:b8dde192f8af58d646fc031fac9c99fe4d00326afc4148f1f043c601a8cfe138", size = 67844, upload-time = "2026-02-28T00:53:19.637Z" },
+]
+
+[[package]]
 name = "jsonschema"
 version = "4.26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1804,11 +1806,9 @@ name = "litellm"
 version = "1.88.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "aiohttp", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -1881,11 +1881,9 @@ name = "litellm-enterprise"
 version = "0.1.42"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/93/fe/fb60dd7bbb88fa65818e70f5f21cdabfe1c5df2302d9dda9bc46ac4fe4d9/litellm_enterprise-0.1.42.tar.gz", hash = "sha256:ec2170d9627a715aa038537a07af8053e6826e115ff6162a41af25d2990f3b2e", size = 70623, upload-time = "2026-05-31T04:12:10.667Z" }
 wheels = [
@@ -1911,11 +1909,9 @@ name = "litellm-proxy-extras"
 version = "0.4.73"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/de/37/bed736f8a623b7891e9ff272fd60c2f08fc4a8fed372885f5df9ec09b769/litellm_proxy_extras-0.4.73.tar.gz", hash = "sha256:d4fb1238fb56cdaa21aef6b1d7683c2c0fe3a148ecd423f8bf4cef3c3d07bd36", size = 43599, upload-time = "2026-05-20T00:00:05.495Z" }
 wheels = [
@@ -2127,11 +2123,9 @@ name = "mcp"
 version = "1.27.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "anyio", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -2193,7 +2187,7 @@ version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang') or (python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (python_full_version >= '3.13' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang') or (python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (python_full_version < '3.13' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.13' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/4a/c27b42ed9b1c7d13d9ba8b6905dece787d6259152f2309338aed29b2447b/ml_dtypes-0.5.4.tar.gz", hash = "sha256:8ab06a50fb9bf9666dd0fe5dfb4676fa2b0ac0f31ecff72a6c3af8e22c063453", size = 692314, upload-time = "2025-11-17T22:32:31.031Z" }
 wheels = [
@@ -2413,12 +2407,9 @@ name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz", hash = "sha256:f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda", size = 20735807, upload-time = "2026-05-18T23:37:14.07Z" }
 wheels = [
@@ -2726,11 +2717,9 @@ name = "openai"
 version = "2.41.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "anyio", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -3515,11 +3504,9 @@ name = "python-multipart"
 version = "0.0.32"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
 wheels = [
@@ -3543,6 +3530,15 @@ wheels = [
 client = [
     { name = "requests", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
     { name = "websocket-client", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+]
+
+[[package]]
+name = "python-ulid"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/40/7e/0d6c82b5ccc71e7c833aed43d9e8468e1f2ff0be1b3f657a6fcafbb8433d/python_ulid-3.1.0.tar.gz", hash = "sha256:ff0410a598bc5f6b01b602851a3296ede6f91389f913a5d5f8c496003836f636", size = 93175, upload-time = "2025-08-18T16:09:26.305Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/a0/4ed6632b70a52de845df056654162acdebaf97c20e3212c559ac43e7216e/python_ulid-3.1.0-py3-none-any.whl", hash = "sha256:e2cdc979c8c877029b4b7a38a6fba3bc4578e4f109a308419ff4d3ccf0a46619", size = 11577, upload-time = "2025-08-18T16:09:25.047Z" },
 ]
 
 [[package]]
@@ -3596,11 +3592,31 @@ wheels = [
 
 [[package]]
 name = "redis"
-version = "8.0.0"
+version = "7.4.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/ae/ed461cca5780b5fc8b9fe8ca0ed98d89508645fb9d880c24cc42c087678f/redis-8.0.0.tar.gz", hash = "sha256:a00c5355432051ac14e593b8b197fc76c887ee12d55a0984f69328a1115fdc49", size = 5101591, upload-time = "2026-05-28T12:45:13.5Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/93/05e7d4a65285066a74f48697f9b9cde5cfce71398033d69ed83c3d98f5c9/redis-7.4.1.tar.gz", hash = "sha256:1a1df5067062cf7cbe677994e391f8ee0840f499d370f1a71266e0dd3aa9308e", size = 4945742, upload-time = "2026-06-05T09:10:06.703Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/e3/b519734372d305bd547534a9f32e4ce9f98552af753dce72cf3483a0ff0b/redis-8.0.0-py3-none-any.whl", hash = "sha256:c938c18338585009f0bc310f4c7e4e4b4d37639356c4ac072cedf3af570c8dc7", size = 499870, upload-time = "2026-05-28T12:45:11.697Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/2e/2677f3f93dae0497e7e33b6637302e7f3744efc553f34231183e32584885/redis-7.4.1-py3-none-any.whl", hash = "sha256:1fa4647af1c5e93a2c685aa248ee44cce092691146d41390518dabe9a99839b0", size = 410171, upload-time = "2026-06-05T09:10:05.128Z" },
+]
+
+[[package]]
+name = "redisvl"
+version = "0.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jsonpath-ng", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "ml-dtypes", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang') or (python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (python_full_version >= '3.13' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.13' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "pydantic", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "python-ulid", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "pyyaml", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "redis", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+    { name = "tenacity", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine != 'x86_64' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm') or (sys_platform != 'linux' and extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/c8/a4001a71558b78198a7ade2d8a1f8df6529b2db9489afbacef4bb7ed1514/redisvl-0.20.0.tar.gz", hash = "sha256:897185019259a6fc31e89920148c60c4c5716e7c2844fd924b85fdbd5fd0953b", size = 1109871, upload-time = "2026-06-04T13:31:02.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/cf/a40413b7dc063ee036819a56f586e2428a18f4a61c11bef6d537a0296d94/redisvl-0.20.0-py3-none-any.whl", hash = "sha256:8c5815c59d8c2f11f7afdbc0d34945c98db6e0455ef78f5df0161e27704945a3", size = 320260, upload-time = "2026-06-04T13:31:00.983Z" },
 ]
 
 [[package]]
@@ -3682,11 +3698,9 @@ name = "rich"
 version = "13.9.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "markdown-it-py", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -3785,11 +3799,9 @@ name = "s3transfer"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "botocore", version = "1.43.25", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -4191,11 +4203,9 @@ name = "soundfile"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "cffi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -4277,6 +4287,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
 ]
 
 [[package]]
@@ -4589,11 +4608,9 @@ name = "transformers"
 version = "5.10.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "huggingface-hub", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -4649,11 +4666,9 @@ name = "typer"
 version = "0.25.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "annotated-doc", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -4728,11 +4743,9 @@ name = "uvicorn"
 version = "0.49.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "click", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang') or (extra == 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm')" },
@@ -4775,11 +4788,9 @@ name = "uvloop"
 version = "0.22.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/f0/18d39dbd1971d6d62c4629cc7fa67f74821b0dc1f5a77af43719de7936a7/uvloop-0.22.1.tar.gz", hash = "sha256:6c84bae345b9147082b17371e3dd5d42775bddce91f885499017f4607fdaf39f", size = 2443250, upload-time = "2025-10-16T22:17:19.342Z" }
 wheels = [
@@ -5032,11 +5043,9 @@ name = "websockets"
 version = "15.0.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra == 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
-    "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-24-gpu-cluster-benchmarking-sglang' and extra != 'group-24-gpu-cluster-benchmarking-vllm'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/21/e6/26d09fab466b7ca9c7737474c52be4f76a40301b08362eb2dbc19dcc16c1/websockets-15.0.1.tar.gz", hash = "sha256:82544de02076bafba038ce055ee6412d68da13ab47f0c60cab827346de828dee", size = 177016, upload-time = "2025-03-05T20:03:41.606Z" }
 wheels = [

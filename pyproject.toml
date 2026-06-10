@@ -42,6 +42,7 @@ benchmark = [
 litellm = [
     "litellm[proxy]>=1.40.0",
     "redis",
+    "redisvl",
 ]
 
 monitoring = [
