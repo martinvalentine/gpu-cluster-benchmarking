@@ -88,13 +88,16 @@ redis-server --daemonize yes
 # 4. Download models
 uv run python scripts/download-models.py
 
-# 5. Start all servers in tmux (reads configs/models.yaml)
+# 5. Prepare benchmark dataset
+./scripts/prepare-dataset.sh                    # → /workspace/datasets/sharegpt.json
+
+# 6. Start all servers in tmux (reads configs/models.yaml)
 ./scripts/start-all-tmux.sh
 
-# 6. Run all benchmarks (per-model loop, reads configs/models.yaml)
+# 7. Run all benchmarks (per-model loop, reads configs/models.yaml)
 ./scripts/bench-models.sh
 
-# 7. Or run specific phase/model
+# 8. Or run specific phase/model
 ./scripts/bench-models.sh -p p0            # P0 models only
 ./scripts/bench-models.sh -m qwen32b-awq   # Specific model
 ./scripts/bench-models.sh --dry-run        # Preview actions
@@ -149,6 +152,10 @@ cluster:
   llamacpp:
     n_parallel: 4           # Concurrent slots
     ctx_size: 4096          # Context window
+
+# Benchmark dataset path
+dataset:
+  sharegpt: /workspace/datasets/sharegpt.json
 ```
 
 Per-model overrides take precedence:
@@ -186,6 +193,7 @@ uv run python scripts/download-models.py --dry-run
 | Script | Purpose |
 |--------|---------|
 | `scripts/bench-models.sh` | Per-model benchmark orchestrator (loops over all models) |
+| `scripts/prepare-dataset.sh` | Download & prepare benchmark dataset (Vietnamese/English) |
 | `scripts/start-all-tmux.sh` | Start all servers in tmux (reads cluster config) |
 | `scripts/stop-all.sh` | Stop all server processes |
 | `scripts/run/run-llamacpp.sh` | Start llama-cpp-turboquant (TurboQuant KV cache) |

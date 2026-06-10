@@ -1,6 +1,25 @@
 # Benchmarks
 
-Requires at least one server running (see [run.md](run.md)).
+Requires at least one server running (see [run.md](run.md)) and a dataset (see below).
+
+## Prepare Dataset
+
+```bash
+# Download Vietnamese vi-alpaca → ShareGPT format (default)
+./scripts/prepare-dataset.sh
+
+# Custom directory
+./scripts/prepare-dataset.sh -d /data/benchmarks
+
+# Skip if exists
+./scripts/prepare-dataset.sh --skip-existing
+```
+
+Dataset path is configured in `configs/models.yaml`:
+```yaml
+dataset:
+  sharegpt: /workspace/datasets/sharegpt.json
+```
 
 ## Per-Model Benchmark Loop (Recommended)
 
