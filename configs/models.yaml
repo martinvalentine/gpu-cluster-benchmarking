@@ -1,0 +1,74 @@
+# ============================================================
+# Model Download Configuration
+# ============================================================
+# Usage:
+#   python scripts/download-models.py                    # Download all enabled models
+#   python scripts/download-models.py --only qwen0.6b    # Download specific model
+#   python scripts/download-models.py --dry-run          # Preview only
+#   python scripts/download-models.py --skip-existing    # Skip if already downloaded
+#
+# Models organized by benchmark phase:
+#   P0 Ultra-Light:  0.6B
+#   P1 Light:        1.5B
+#   P2 Medium:       3B
+#   P3 Heavy:        7B
+# ============================================================
+
+base_dir: /workspace/models
+
+models:
+  # ── Phase P0: Ultra-Light (0.6B) ────────────────────────────
+  - name: qwen0.6b
+    repo_id: Qwen/Qwen2.5-0.6B-Instruct
+    local_dir: hf/qwen2.5-0.6b
+    format: hf
+    enabled: false
+
+  - name: qwen0.6b-gguf
+    repo_id: Qwen/Qwen2.5-0.6B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-0.6b
+    format: gguf
+    include: "*q4_k_m.gguf"
+    enabled: false
+
+  # ── Phase P1: Light (1.5B) ──────────────────────────────────
+  - name: qwen1.5b
+    repo_id: Qwen/Qwen2.5-1.5B-Instruct
+    local_dir: hf/qwen2.5-1.5b
+    format: hf
+    enabled: false
+
+  - name: qwen1.5b-gguf
+    repo_id: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-1.5b
+    format: gguf
+    include: "*q4_k_m.gguf"
+    enabled: false
+
+  # ── Phase P2: Medium (3B) ───────────────────────────────────
+  - name: qwen3b
+    repo_id: Qwen/Qwen2.5-3B-Instruct
+    local_dir: hf/qwen2.5-3b
+    format: hf
+    enabled: false
+
+  - name: qwen3b-gguf
+    repo_id: Qwen/Qwen2.5-3B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-3b
+    format: gguf
+    include: "*q4_k_m.gguf"
+    enabled: false
+
+  # ── Phase P3: Heavy (7B) ────────────────────────────────────
+  - name: qwen7b
+    repo_id: Qwen/Qwen2.5-7B-Instruct
+    local_dir: hf/qwen2.5-7b
+    format: hf
+    enabled: false
+
+  - name: qwen7b-gguf
+    repo_id: Qwen/Qwen2.5-7B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-7b
+    format: gguf
+    include: "*q4_k_m.gguf"
+    enabled: false
