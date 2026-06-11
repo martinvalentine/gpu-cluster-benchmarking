@@ -145,7 +145,7 @@ if not gpu_count:
 vllm_defaults = cluster.get("vllm", {})
 llamacpp_defaults = cluster.get("llamacpp", {})
 
-base_dir = cfg.get("base_dir", "models")
+base_dir = os.environ.get("BENCH_BASE_DIR", cfg.get("base_dir", "models"))
 models = cfg.get("models", [])
 
 for m in models:
@@ -211,22 +211,27 @@ for m in models:
 
 # Output dataset path as first line
 dataset_cfg = cfg.get("dataset", {})
-sharegpt_path = dataset_cfg.get("sharegpt", "/workspace/datasets/sharegpt.json")
+sharegpt_path = os.environ.get("BENCH_DATASET_PATH", dataset_cfg.get("sharegpt", "/workspace/datasets/sharegpt.json"))
 print(f"DATASET|{sharegpt_path}")
 PYEOF
 }
 
 # ── Wait for server ─────────────────────────────────────────────
 wait_for_server() {
-    local name=$1 url=$2 timeout=${3:-60}
+    local name=$1 url=$2 timeout=${3:-60} proc_pattern=${4:-}
     local elapsed=0
     while [[ $elapsed -lt $timeout ]]; do
         if curl -sf "$url" >/dev/null 2>&1; then
             return 0
         fi
+        if [[ -n "$proc_pattern" ]] && ! pgrep -f "$proc_pattern" >/dev/null 2>&1; then
+            log "  $name process died — check /tmp/bench_*.log for details"
+            return 1
+        fi
         sleep 2
         elapsed=$((elapsed + 2))
     done
+    log "  $name timed out after ${timeout}s"
     return 1
 }
 
@@ -338,6 +343,11 @@ start_vllm() {
         return 0
     fi
 
+    if [[ ! -d "$model_path" ]]; then
+        fail "Model directory not found: $model_path"
+        return 1
+    fi
+
     kill_tmux_session "bench-vllm"
     kill_server_by_name "vllm"
     if ! wait_for_process_exit "vllm serve " 3; then
@@ -354,9 +364,9 @@ start_vllm() {
         return 1
     fi
 
-    local quant_args=()
+    local quant_str=""
     if [[ "$quant" != "none" ]]; then
-        quant_args=(--quantization "$quant")
+        quant_str="--quantization $quant"
     fi
 
     wait_gpu_free 5000 30
@@ -374,14 +384,19 @@ start_vllm() {
             --block-size $block_size \
             --dtype $dtype \
             --trust-remote-code \
-            ${quant_args[@]:-} 2>&1 | tee /tmp/bench_vllm.log; sleep infinity"
+            $quant_str 2>&1 | tee /tmp/bench_vllm.log; sleep infinity"
 
     log "  Waiting for vLLM to be ready..."
-    if wait_for_server "vLLM" "http://localhost:$port/v1/models" 120; then
+    if wait_for_server "vLLM" "http://localhost:$port/v1/models" 120 "vllm serve"; then
         ok "vLLM ready on port $port"
         return 0
     else
         fail "vLLM failed to start on port $port"
+        if [[ -f /tmp/bench_vllm.log ]]; then
+            echo -e "  ${DIM}Last 10 lines of /tmp/bench_vllm.log:${NC}"
+            tail -10 /tmp/bench_vllm.log | sed 's/^/    /'
+        fi
+        stop_server "vllm"
         return 1
     fi
 }
@@ -398,7 +413,13 @@ start_llamacpp() {
         return 0
     fi
 
+    if [[ ! -f "$model_path" ]]; then
+        fail "Model file not found: $model_path"
+        return 1
+    fi
+
     kill_tmux_session "bench-llamacpp"
+    kill_tmux_session "bench-llama"
     kill_server_by_name "llamacpp"
     if ! wait_for_process_exit "llama-server" 3; then
         force_kill_by_name "llama-server"
@@ -414,9 +435,9 @@ start_llamacpp() {
     fi
 
     # Resolve threads: 0 = auto (nproc)
-    local threads_args=()
+    local threads_str=""
     if [[ "$threads" -gt 0 ]]; then
-        threads_args=(-t "$threads")
+        threads_str="-t $threads"
     fi
 
     # Resolve ngl: "all" → -ngl 999
@@ -439,17 +460,22 @@ start_llamacpp() {
             --host 0.0.0.0 --port $port \
             -np $np -c $ctx -ngl $ngl_value \
             -b $batch -ub $ubatch \
-            ${threads_args[@]:-} \
+            $threads_str \
             -ctk $ctk -ctv $ctv -fa $fa \
             $cp_flag \
             2>&1 | tee /tmp/bench_llama.log; sleep infinity"
 
     log "  Waiting for llama.cpp to be ready..."
-    if wait_for_server "llama.cpp" "http://localhost:$port/health" 120; then
+    if wait_for_server "llama.cpp" "http://localhost:$port/health" 120 "llama-server"; then
         ok "llama.cpp ready on port $port"
         return 0
     else
         fail "llama.cpp failed to start on port $port"
+        if [[ -f /tmp/bench_llama.log ]]; then
+            echo -e "  ${DIM}Last 10 lines of /tmp/bench_llama.log:${NC}"
+            tail -10 /tmp/bench_llama.log | sed 's/^/    /'
+        fi
+        stop_server "llamacpp"
         return 1
     fi
 }
@@ -468,6 +494,9 @@ stop_server() {
 
     # Kill tmux session and all its child process trees
     kill_tmux_session "$session"
+    if [[ "$fw" == "llamacpp" ]]; then
+        kill_tmux_session "bench-llama"
+    fi
 
     # Kill remaining server processes by name pattern
     kill_server_by_name "$fw"
@@ -530,22 +559,35 @@ run_benchmark() {
             "$bench_script" -p "$BENCH_PHASE" 2>&1 | tee -a "$LOG_FILE"
         fi
     elif [[ "$fw" == "llamacpp" ]]; then
-        # Map bench-phase to llamacpp concurrency levels
-        local llama_conc=""
-        case "$BENCH_PHASE" in
-            p0) llama_conc="1" ;;
-            p1) llama_conc="1 4" ;;
-            p2) llama_conc="1 4 8" ;;
-            p3) llama_conc="1 4 8 16" ;;
-            *)  llama_conc="" ;;  # use script default
-        esac
-        local conc_args=()
-        if [[ -n "$llama_conc" ]]; then
-            conc_args=(-c "$llama_conc")
+        if [[ "$BENCH_TYPE" == "stress" ]]; then
+            local stress_script="${PROJECT_ROOT}/scripts/benchmark/bench-llamacpp-stress.sh"
+            if [[ ! -f "$stress_script" ]]; then
+                warn "Stress benchmark script not found: $stress_script"
+                return 1
+            fi
+            LLAMA_RESULTS_DIR="$results_dir" \
+            LLAMA_BENCH_URL="http://localhost:$port/v1" \
+            LLAMA_CONC_BASE="$CONC_BASE" \
+            LLAMA_CONC_STEP="$CONC_STEP" \
+            LLAMA_CONC_MAX="$CONC_MAX" \
+            "$stress_script" 2>&1 | tee -a "$LOG_FILE"
+        else
+            local llama_conc=""
+            case "$BENCH_PHASE" in
+                p0) llama_conc="1" ;;
+                p1) llama_conc="1 4" ;;
+                p2) llama_conc="1 4 8" ;;
+                p3) llama_conc="1 4 8 16" ;;
+                *)  llama_conc="" ;;  # use script default
+            esac
+            local conc_args=()
+            if [[ -n "$llama_conc" ]]; then
+                conc_args=(-c "$llama_conc")
+            fi
+            LLAMA_RESULTS_DIR="$results_dir" \
+            LLAMA_BENCH_URL="http://localhost:$port/v1" \
+            "$bench_script" ${conc_args[@]+"${conc_args[@]}"} 2>&1 | tee -a "$LOG_FILE"
         fi
-        LLAMA_RESULTS_DIR="$results_dir" \
-        LLAMA_BENCH_URL="http://localhost:$port/v1" \
-        "$bench_script" ${conc_args[@]:-} 2>&1 | tee -a "$LOG_FILE"
     fi
 }
 
@@ -573,7 +615,7 @@ echo ""
 mapfile -t ALL_LINES < <(parse_models "$YAML_CONFIG" "$PHASE" "${SELECTED_MODELS[@]+"${SELECTED_MODELS[@]}"}")
 
 # Extract dataset path (first line)
-DATASET_PATH="/workspace/datasets/sharegpt.json"
+DATASET_PATH="${BENCH_DATASET_PATH:-/workspace/datasets/sharegpt.json}"
 MODEL_LINES=()
 for line in "${ALL_LINES[@]}"; do
     if [[ "$line" == DATASET\|* ]]; then
@@ -618,7 +660,6 @@ FAILED_LIST=()
 
 for line in "${MODEL_LINES[@]}"; do
     IFS='|' read -r name backend model_path m_phase vllm_tp vllm_gpu_mem vllm_quant vllm_max_seqs gpu_count skip vllm_max_model_len vllm_max_batched_tokens vllm_block_size vllm_dtype llama_np llama_ctx llama_ngl llama_batch llama_ubatch llama_threads llama_ctk llama_ctv llama_fa llama_cp <<< "$line"
-    RUN_NUM=$((RUN_NUM + 1))
 
     # Skip models not matching backend filter
     if [[ ${#BACKEND_FILTER[@]} -gt 0 ]]; then
@@ -634,6 +675,7 @@ for line in "${MODEL_LINES[@]}"; do
         fi
     fi
 
+    RUN_NUM=$((RUN_NUM + 1))
     TOTAL=$((TOTAL + 1))
 
     # Skip models that need more GPUs than available
