@@ -151,11 +151,11 @@ bench_single() {
 
         local decode_tps="?"
         if [[ "$c_tok" =~ ^[0-9]+$ ]] && [ "$c_tok" -gt 0 ]; then
-            decode_tps=$(echo "scale=1; $c_tok * 1000 / $elapsed" | bc 2>/dev/null || echo "?")
+            decode_tps=$(awk "BEGIN{printf \"%.1f\", $c_tok * 1000 / $elapsed}" 2>/dev/null || echo "?")
         fi
 
         ok "    prompt=$p_tok tok | completion=$c_tok tok | total=${elapsed}ms | decode=$decode_tps t/s | finish=$finish"
-        echo -e "$label\t$p_tok\t$c_tok\t${elapsed}\t$decode_tps\t$(echo "scale=2; $elapsed/1000" | bc)" >> "$out_file"
+        echo -e "$label\t$p_tok\t$c_tok\t${elapsed}\t$decode_tps\t$(awk "BEGIN{printf \"%.2f\", $elapsed/1000}")" >> "$out_file"
         echo "  GPU: $(gpu_vram)"
     done
 }
@@ -231,9 +231,9 @@ except: print('model')
 
     local agg_tps per_user_tps avg_latency
     if [ "$count" -gt 0 ] && [ "$wall" -gt 0 ]; then
-        agg_tps=$(echo "scale=1; $total_tok * 1000 / $wall" | bc 2>/dev/null || echo "?")
-        per_user_tps=$(echo "scale=1; $total_tok * 1000 / $total_time" | bc 2>/dev/null || echo "?")
-        avg_latency=$(echo "scale=0; $total_time / $count" | bc 2>/dev/null || echo "?")
+        agg_tps=$(awk "BEGIN{printf \"%.1f\", $total_tok * 1000 / $wall}" 2>/dev/null || echo "?")
+        per_user_tps=$(awk "BEGIN{printf \"%.1f\", $total_tok * 1000 / $total_time}" 2>/dev/null || echo "?")
+        avg_latency=$(awk "BEGIN{printf \"%.0f\", $total_time / $count}" 2>/dev/null || echo "?")
     fi
 
     ok "  Completed: $count/$np requests"
@@ -300,10 +300,10 @@ bench_long_context() {
 
         local prefill_tps="?" decode_tps="?"
         if [[ "$c_tok" =~ ^[0-9]+$ ]] && [ "$c_tok" -gt 0 ]; then
-            decode_tps=$(echo "scale=1; $c_tok * 1000 / $elapsed" | bc 2>/dev/null || echo "?")
+            decode_tps=$(awk "BEGIN{printf \"%.1f\", $c_tok * 1000 / $elapsed}" 2>/dev/null || echo "?")
         fi
         if [[ "$p_tok" =~ ^[0-9]+$ ]] && [ "$p_tok" -gt 0 ]; then
-            prefill_tps=$(echo "scale=0; $p_tok * 1000 / $elapsed" | bc 2>/dev/null || echo "?")
+            prefill_tps=$(awk "BEGIN{printf \"%.0f\", $p_tok * 1000 / $elapsed}" 2>/dev/null || echo "?")
         fi
 
         ok "    p_tok=$p_tok | c_tok=$c_tok | total=${elapsed}ms | prefill~$prefill_tps t/s | decode~$decode_tps t/s"
@@ -320,7 +320,7 @@ snap_metrics() {
     local metrics
     metrics=$(curl -sf "${BASE_URL%/v1}/metrics" 2>/dev/null || echo "")
     if [ -z "$metrics" ]; then
-        warn "Cannot reach /metrics (only available on llama.cpp servers with --enable-metrics)"
+        warn "Cannot reach /metrics (start llama-server with --metrics to enable)"
         return
     fi
 
@@ -332,7 +332,7 @@ snap_metrics() {
 
     echo "  Slots idle:       ${slots_idle:-N/A}"
     echo "  Slots processing: ${slots_proc:-N/A}"
-    echo "  KV cache usage:   $(echo "${kv_ratio:-0} * 100" | bc -l 2>/dev/null | xargs printf "%.1f")%"
+    echo "  KV cache usage:   $(awk "BEGIN{printf \"%.1f\", ${kv_ratio:-0} * 100}")%"
     echo "  Tokens/sec:       ${tps:-N/A}"
     echo "  GPU: $(gpu_vram)"
 
@@ -348,7 +348,7 @@ print_summary() {
     for f in "$RESULTS_DIR"/*.tsv; do
         [ -f "$f" ] || continue
         echo -e "${CYAN}$(basename "$f")${NC}"
-        column -t -s $'\t' "$f" 2>/dev/null | sed 's/^/  /'
+        column -t -s $'\t' "$f" 2>/dev/null | sed 's/^/  /' || cat "$f" | sed 's/^/  /'
         echo ""
     done
 }
@@ -377,4 +377,4 @@ main() {
     sep
 }
 
-main "$@"
+main "$@" || true

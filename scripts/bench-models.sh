@@ -463,6 +463,7 @@ start_llamacpp() {
             $threads_str \
             -ctk $ctk -ctv $ctv -fa $fa \
             $cp_flag \
+            --metrics \
             2>&1 | tee /tmp/bench_llama.log; sleep infinity"
 
     log "  Waiting for llama.cpp to be ready..."

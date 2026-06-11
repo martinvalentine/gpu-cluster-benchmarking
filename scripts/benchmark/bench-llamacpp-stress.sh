@@ -138,9 +138,9 @@ run_concurrent() {
 
     local agg_tps="?" per_user_tps="?" avg_latency="?"
     if [ "$count" -gt 0 ] && [ "$wall" -gt 0 ]; then
-        agg_tps=$(echo "scale=1; $total_tok * 1000 / $wall" | bc 2>/dev/null || echo "?")
-        per_user_tps=$(echo "scale=1; $total_tok * 1000 / $total_time" | bc 2>/dev/null || echo "?")
-        avg_latency=$(echo "scale=0; $total_time / $count" | bc 2>/dev/null || echo "?")
+        agg_tps=$(awk "BEGIN{printf \"%.1f\", $total_tok * 1000 / $wall}" 2>/dev/null || echo "?")
+        per_user_tps=$(awk "BEGIN{printf \"%.1f\", $total_tok * 1000 / $total_time}" 2>/dev/null || echo "?")
+        avg_latency=$(awk "BEGIN{printf \"%.0f\", $total_time / $count}" 2>/dev/null || echo "?")
     fi
 
     echo "$count $total_tok $wall $agg_tps $per_user_tps $avg_latency"
@@ -205,5 +205,5 @@ echo "  Results:         ${OUT_FILE}"
 echo ""
 sep
 echo -e "${CYAN}$(basename "$OUT_FILE")${NC}"
-column -t -s $'\t' "$OUT_FILE" 2>/dev/null | sed 's/^/  /'
+column -t -s $'\t' "$OUT_FILE" 2>/dev/null | sed 's/^/  /' || cat "$OUT_FILE" | sed 's/^/  /'
 echo ""
