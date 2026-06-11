@@ -39,14 +39,26 @@ if not gpu_count:
         gpu_count = 1
 
 vllm_cluster = cluster.get("vllm", {})
+llamacpp_cluster = cluster.get("llamacpp", {})
 
 vllm_path = ""
-vllm_tp = vllm_cluster.get("tp", 1)
-vllm_gpu_mem = vllm_cluster.get("gpu_mem_util", "0.87")
+vllm_tp = vllm_cluster.get("tp", 6)
+vllm_gpu_mem = vllm_cluster.get("gpu_mem_util", "0.92")
 vllm_max_model_len = vllm_cluster.get("max_model_len", 4096)
-vllm_max_num_seqs = vllm_cluster.get("max_num_seqs", 64)
+vllm_max_num_seqs = vllm_cluster.get("max_num_seqs", 512)
+vllm_max_batched_tokens = vllm_cluster.get("max_batched_tokens", 16384)
+vllm_block_size = vllm_cluster.get("block_size", 16)
+vllm_dtype = vllm_cluster.get("dtype", "auto")
 llama_path = ""
 embed_path = ""
+llama_np = llamacpp_cluster.get("n_parallel", 8)
+llama_ctx = llamacpp_cluster.get("ctx_size", 8192)
+llama_batch = llamacpp_cluster.get("batch", 4096)
+llama_ubatch = llamacpp_cluster.get("ubatch", 1024)
+llama_threads = llamacpp_cluster.get("threads", 60)
+llama_ctk = llamacpp_cluster.get("cache_key", "q8_0")
+llama_ctv = llamacpp_cluster.get("cache_val", "turbo4")
+llama_fa = llamacpp_cluster.get("flash_attn", "on")
 
 for m in models:
     if not m.get("enabled", True):
@@ -99,8 +111,19 @@ if vllm_path:
     print(f"VLLM_TP={vllm_tp}")
     print(f"VLLM_GPU_MEM={vllm_gpu_mem}")
     print(f"VLLM_MAX_SEQS={vllm_max_num_seqs}")
+    print(f"MAX_BATCHED_TOKENS={vllm_max_batched_tokens}")
+    print(f"BLOCK_SIZE={vllm_block_size}")
+    print(f"DTYPE={vllm_dtype}")
 if llama_path:
     print(f"LLAMA_MODEL={llama_path}")
+    print(f"LLAMA_NP={llama_np}")
+    print(f"LLAMA_CTX={llama_ctx}")
+    print(f"LLAMA_BATCH={llama_batch}")
+    print(f"LLAMA_UBATCH={llama_ubatch}")
+    print(f"LLAMA_THREADS={llama_threads}")
+    print(f"LLAMA_CTK={llama_ctk}")
+    print(f"LLAMA_CTV={llama_ctv}")
+    print(f"LLAMA_FA={llama_fa}")
 if embed_path:
     print(f"EMBED_MODEL={embed_path}")
 print(f"GPU_COUNT={gpu_count}")
@@ -109,13 +132,24 @@ PYEOF
 
     while IFS='=' read -r key val; do
         case "$key" in
-            VLLM_MODEL)      VLLM_MODEL="$val" ;;
-            VLLM_TP)         VLLM_TP="$val" ;;
-            VLLM_GPU_MEM)    VLLM_GPU_MEM="$val" ;;
-            VLLM_MAX_SEQS)   VLLM_MAX_NUM_SEQS="$val" ;;
-            LLAMA_MODEL)     LLAMA_MODEL="$val" ;;
-            EMBED_MODEL)     EMBED_MODEL="$val" ;;
-            GPU_COUNT)       GPU_COUNT="$val" ;;
+            VLLM_MODEL)          VLLM_MODEL="$val" ;;
+            VLLM_TP)             VLLM_TP="$val" ;;
+            VLLM_GPU_MEM)        VLLM_GPU_MEM="$val" ;;
+            VLLM_MAX_SEQS)       VLLM_MAX_NUM_SEQS="$val" ;;
+            MAX_BATCHED_TOKENS)  MAX_BATCHED_TOKENS="$val" ;;
+            BLOCK_SIZE)          BLOCK_SIZE="$val" ;;
+            DTYPE)               DTYPE="$val" ;;
+            LLAMA_MODEL)         LLAMA_MODEL="$val" ;;
+            LLAMA_NP)            LLAMA_NP="$val" ;;
+            LLAMA_CTX)           LLAMA_CTX="$val" ;;
+            LLAMA_BATCH)         LLAMA_BATCH="$val" ;;
+            LLAMA_UBATCH)        LLAMA_UBATCH="$val" ;;
+            LLAMA_THREADS)       LLAMA_THREADS="$val" ;;
+            LLAMA_CTK)           LLAMA_CTK="$val" ;;
+            LLAMA_CTV)           LLAMA_CTV="$val" ;;
+            LLAMA_FA)            LLAMA_FA="$val" ;;
+            EMBED_MODEL)         EMBED_MODEL="$val" ;;
+            GPU_COUNT)           GPU_COUNT="$val" ;;
         esac
     done <<< "$resolved"
 }
@@ -126,10 +160,21 @@ VLLM_MODEL="${VLLM_MODEL:-}"
 LLAMA_MODEL="${LLAMA_MODEL:-}"
 EMBED_MODEL="${EMBED_MODEL:-}"
 
-TP=${VLLM_TP:-1}
-GPU_MEM_UTIL=${VLLM_GPU_MEM:-0.87}
+TP=${VLLM_TP:-6}
+GPU_MEM_UTIL=${VLLM_GPU_MEM:-0.92}
 MAX_MODEL_LEN=${VLLM_MAX_MODEL_LEN:-4096}
-MAX_NUM_SEQS=${VLLM_MAX_NUM_SEQS:-64}
+MAX_NUM_SEQS=${VLLM_MAX_NUM_SEQS:-512}
+MAX_BATCHED_TOKENS=${MAX_BATCHED_TOKENS:-16384}
+BLOCK_SIZE=${BLOCK_SIZE:-16}
+DTYPE=${DTYPE:-auto}
+LLAMA_NP=${LLAMA_NP:-8}
+LLAMA_CTX=${LLAMA_CTX:-8192}
+LLAMA_BATCH=${LLAMA_BATCH:-4096}
+LLAMA_UBATCH=${LLAMA_UBATCH:-1024}
+LLAMA_THREADS=${LLAMA_THREADS:-60}
+LLAMA_CTK=${LLAMA_CTK:-q8_0}
+LLAMA_CTV=${LLAMA_CTV:-turbo4}
+LLAMA_FA=${LLAMA_FA:-on}
 GPU_COUNT=${GPU_COUNT:-0}
 
 # Auto-detect GPU count if not set
@@ -222,14 +267,17 @@ tmux new-session -d -s "$SESSION" -n "vllm" \
         --max-num-seqs $MAX_NUM_SEQS \
         --enable-prefix-caching \
         --enable-chunked-prefill \
-        --max-num-batched-tokens 8192 \
-        --trust-remote-code \
-        --enforce-eager 2>&1 | tee /tmp/vllm.log; sleep infinity"
+        --max-num-batched-tokens $MAX_BATCHED_TOKENS \
+        --block-size $BLOCK_SIZE \
+        --dtype $DTYPE \
+        --trust-remote-code 2>&1 | tee /tmp/vllm.log; sleep infinity"
 ok "vLLM window created (port 8000)"
 
 tmux new-window -t "$SESSION" -n "llama" \
     "cd $PROJECT_ROOT && bash scripts/run/run-llamacpp.sh \
-        -p 8001 -n 4 -c 4096 -ng all \
+        -p 8001 -n $LLAMA_NP -c $LLAMA_CTX -ng all \
+        -b $LLAMA_BATCH -ub $LLAMA_UBATCH -t $LLAMA_THREADS \
+        -ctk $LLAMA_CTK -ctv $LLAMA_CTV -fa $LLAMA_FA \
         $LLAMA_MODEL 2>&1 | tee /tmp/llama.log; sleep infinity"
 ok "llama.cpp window created (port 8001)"
 

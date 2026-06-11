@@ -54,16 +54,16 @@ EOF
 MODEL=""
 PORT="${VLLM_PORT:-8000}"
 HOST="${VLLM_HOST:-0.0.0.0}"
-TP="${VLLM_TP:-1}"
-GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.87}"
+TP="${VLLM_TP:-6}"
+GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.92}"
 MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-4096}"
-MAX_NUM_SEQS="${VLLM_MAX_NUM_SEQS:-256}"
-QUANT="${VLLM_QUANT:-awq}"
+MAX_NUM_SEQS="${VLLM_MAX_NUM_SEQS:-512}"
+QUANT="${VLLM_QUANT:-none}"
 PREFIX_CACHE="--enable-prefix-caching"
 CHUNKED_PREFILL="--enable-chunked-prefill"
-MAX_BATCHED_TOKENS="${VLLM_MAX_BATCHED_TOKENS:-8192}"
-SWAP_SPACE="${VLLM_SWAP_SPACE:-4}"
-METRICS_PORT="${VLLM_METRICS_PORT:-9090}"
+MAX_BATCHED_TOKENS="${VLLM_MAX_BATCHED_TOKENS:-16384}"
+BLOCK_SIZE="${VLLM_BLOCK_SIZE:-16}"
+DTYPE="${VLLM_DTYPE:-auto}"
 TRUST_REMOTE="--trust-remote-code"
 
 while [[ $# -gt 0 ]]; do
@@ -127,10 +127,12 @@ row "TP Size"        "${TP} GPUs"
 row "GPU Mem"        "${GPU_MEM_UTIL}"
 row "Max Seqs"       "${MAX_NUM_SEQS}"
 row "Max Context"    "${MAX_MODEL_LEN}"
+row "Batched Tok"    "${MAX_BATCHED_TOKENS}"
+row "Block Size"     "${BLOCK_SIZE}"
+row "Dtype"          "${DTYPE}"
 row "Quantization"   "${QUANT:-none}"
 row "Prefix Cache"   "$( [[ -n "$PREFIX_CACHE" ]] && echo "ON" || echo "OFF" )"
-row "Chunked Prefill" "$( [[ -n "$CHUNKED_PREFILL" ]] && echo "ON (${MAX_BATCHED_TOKENS} tok)" || echo "OFF" )"
-row "Swap"           "${SWAP_SPACE} GB"
+row "Chunked Prefill" "$( [[ -n "$CHUNKED_PREFILL" ]] && echo "ON" || echo "OFF" )"
 sep
 row "GPU"            "${GPU_COUNT}x ${GPU_NAME} (${GPU_VRAM})"
 echo -e "  ${GREEN}${BOLD}══════════════════════════════════════════════════${NC}"
@@ -147,4 +149,6 @@ exec vllm serve "$MODEL" \
     $PREFIX_CACHE \
     $CHUNKED_PREFILL \
     --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
+    --block-size "$BLOCK_SIZE" \
+    --dtype "$DTYPE" \
     $TRUST_REMOTE
