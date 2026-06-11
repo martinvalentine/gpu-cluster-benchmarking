@@ -117,8 +117,8 @@ parse_models() {
     shift 2
     local selected=("$@")
 
-    uv run python - "$yaml" "$phase" "${selected[@]+"${selected[@]}"}" <<'PYEOF'
-import sys, yaml, subprocess
+    "$PROJECT_ROOT/.venv/bin/python" - "$yaml" "$phase" "${selected[@]+"${selected[@]}"}" <<'PYEOF'
+import sys, yaml, subprocess, os
 from pathlib import Path
 
 yaml_path = sys.argv[1]
@@ -592,7 +592,13 @@ run_benchmark() {
 }
 
 # ── Main ────────────────────────────────────────────────────────
-LOG_FILE="${RESULTS_DIR}/bench_models_$(date +%Y%m%d_%H%M%S).log"
+# Auto-create session folder: YYYYMMDD_benchmark
+# Structure: results/YYYYMMDD_benchmark/{vllm,llamacpp}_run/run-N/
+if [[ -z "${BENCH_RESULTS_DIR:-}" ]]; then
+    SESSION_STAMP="$(date +%Y%m%d_%H%M%S)"
+    RESULTS_DIR="${PROJECT_ROOT}/results/${SESSION_STAMP}_benchmark"
+fi
+LOG_FILE="${RESULTS_DIR}/bench.log"
 mkdir -p "$RESULTS_DIR"
 
 echo ""
@@ -685,10 +691,11 @@ for line in "${MODEL_LINES[@]}"; do
         continue
     fi
 
-    RUN_DIR="${RESULTS_DIR}/run-${RUN_NUM}"
+    RUN_DIR="${RESULTS_DIR}/${backend}_run/run-${RUN_NUM}"
     header "Run $RUN_NUM: $name ($backend, $m_phase)"
 
     log "  Results: $RUN_DIR/"
+    mkdir -p "$RUN_DIR"
 
     PORT=8000
     if [[ "$backend" == "llamacpp" ]]; then
@@ -698,26 +705,30 @@ for line in "${MODEL_LINES[@]}"; do
     # Start server
     if [[ "$backend" == "vllm" ]]; then
         if ! start_vllm "$model_path" "$PORT" "$vllm_tp" "$vllm_gpu_mem" "$vllm_quant" "$vllm_max_seqs" "$vllm_max_model_len" "$vllm_max_batched_tokens" "$vllm_block_size" "$vllm_dtype"; then
+            echo "FAILED: server did not start" > "$RUN_DIR/FAILED"
             FAILED_LIST+=("$name")
             continue
         fi
     elif [[ "$backend" == "llamacpp" ]]; then
         if ! start_llamacpp "$model_path" "$PORT" "$llama_np" "$llama_ctx" "$llama_ngl" "$llama_batch" "$llama_ubatch" "$llama_threads" "$llama_ctk" "$llama_ctv" "$llama_fa" "$llama_cp"; then
+            echo "FAILED: server did not start" > "$RUN_DIR/FAILED"
             FAILED_LIST+=("$name")
             continue
         fi
     else
         warn "Unknown backend: $backend, skipping"
+        echo "FAILED: unknown backend" > "$RUN_DIR/FAILED"
         FAILED_LIST+=("$name")
         continue
     fi
 
     # Run benchmark
-    BENCH_DIR="${RUN_DIR}/${backend}"
+    BENCH_DIR="$RUN_DIR"
     if run_benchmark "$backend" "$name" "$model_path" "$PORT" "$BENCH_DIR"; then
         PASSED=$((PASSED + 1))
         ok "Run $RUN_NUM complete: $name"
     else
+        echo "FAILED: benchmark error" > "$RUN_DIR/FAILED"
         FAILED_LIST+=("$name")
         fail "Run $RUN_NUM failed: $name"
     fi
@@ -746,15 +757,19 @@ echo ""
 echo -e "  Results: ${CYAN}$RESULTS_DIR/${NC}"
 echo ""
 echo -e "  ${DIM}Structure:${NC}"
-for d in "$RESULTS_DIR"/run-*/; do
-    [[ -d "$d" ]] || continue
-    run_name=$(basename "$d")
-    echo -e "    ${CYAN}$run_name/${NC}"
-    for fw_dir in "$d"*/; do
-        [[ -d "$fw_dir" ]] || continue
-        fw_name=$(basename "$fw_dir")
-        count=$(find "$fw_dir" -name "*.json" 2>/dev/null | wc -l)
-        echo -e "      $fw_name/ ($count files)"
+for backend_dir in "$RESULTS_DIR"/*_run/; do
+    [[ -d "$backend_dir" ]] || continue
+    backend_name=$(basename "$backend_dir")
+    echo -e "    ${CYAN}$backend_name/${NC}"
+    for run_dir in "$backend_dir"run-*/; do
+        [[ -d "$run_dir" ]] || continue
+        run_name=$(basename "$run_dir")
+        if [[ -f "$run_dir/FAILED" ]]; then
+            echo -e "      ${RED}$run_name/ (FAILED)${NC}"
+        else
+            count=$(find "$run_dir" -name "*.tsv" -o -name "*.json" 2>/dev/null | wc -l)
+            echo -e "      $run_name/ ($count files)"
+        fi
     done
 done
 echo ""
