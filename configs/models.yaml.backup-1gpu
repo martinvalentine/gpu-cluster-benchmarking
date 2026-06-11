@@ -1,0 +1,202 @@
+# ============================================================
+# Model Download & Endpoint Configuration
+# ============================================================
+# Single source of truth for:
+#   1. Which models to download (download-models.py)
+#   2. Which endpoints to route through LiteLLM proxy (gen-litellm-config.py)
+#   3. Which servers to start (start-all-tmux.sh)
+#   4. Per-model benchmark settings (bench-models.sh)
+#
+# Usage:
+#   uv run python scripts/download-models.py                         # Download all enabled
+#   uv run python scripts/download-models.py --only qwen32b-awq     # Download specific
+#   uv run python scripts/download-models.py --phase p0 p1           # Download by phase
+#   uv run python scripts/download-models.py --dry-run               # Preview
+#   uv run python scripts/gen-litellm-config.py                      # Regenerate proxy config
+#
+# Models organized by benchmark phase (from benchmark_plan.md):
+#   P0 Ultra-Light:  0.6B  (~0.2 GB VRAM)
+#   P1 Light:        7B    (~3 GB VRAM)
+#   P2 Medium:       14B   (~5 GB VRAM)
+#   P3 Heavy:        32B   (~20 GB VRAM with AWQ)
+#
+# Cluster config:
+#   Adjust `cluster` section to match your pod's GPU count and memory.
+#   Per-model vllm_tp/vllm_gpu_mem override cluster defaults.
+#   Models requiring more GPUs than cluster.gpu_count are auto-skipped.
+# ============================================================
+
+# ── Cluster Configuration ──────────────────────────────────────
+# Adjust this section for your pod environment.
+# gpu_count: auto-detected from nvidia-smi if set to 0 or omitted.
+cluster:
+  gpu_count: 0              # 0 = auto-detect from nvidia-smi
+
+  # Default vLLM server settings (per-model overrides take precedence)
+  vllm:
+    tp: 1                   # Default tensor parallel size
+    gpu_mem_util: "0.87"    # GPU memory utilization (0.0-1.0)
+    max_model_len: 4096     # Max context length
+    max_num_seqs: 64        # Max concurrent sequences
+    max_batched_tokens: 8192
+    quant: none             # Default quantization: awq, gptq, none
+    swap_space: 4           # GB swap for KV cache
+
+  # Default llama.cpp server settings (per-model overrides take precedence)
+  llamacpp:
+    n_parallel: 4           # Concurrent slots (-np)
+    ctx_size: 4096          # Context window (-c)
+    n_gpu_layers: all       # GPU layers offload (-ngl): number or "all"
+    batch: 2048             # Prefill batch size (-b)
+    ubatch: 512             # Micro-batch size (-ub)
+    threads: 0              # CPU threads (-t): 0 = auto (nproc)
+    cache_key: q8_0         # KV cache key type (-ctk)
+    cache_val: turbo4       # KV cache value type (-ctv)
+    flash_attn: on          # Flash Attention (-fa): on/off/auto
+    cache_prompt: true      # Enable prompt caching (--cache-prompt)
+
+# Base directory for all models
+base_dir: /workspace/models
+
+# Default backend ports (used by gen-litellm-config.py)
+ports:
+  vllm: 8000
+  llamacpp: 8001
+  sglang: 8002
+  embedding: 8003
+  proxy: 4000
+
+# Benchmark dataset path
+dataset:
+  sharegpt: /workspace/datasets/sharegpt.json
+
+models:
+  # ── Embedding Model (for LiteLLM semantic cache) ────────────
+  - name: qwen3-embedding
+    repo_id: Qwen/Qwen3-Embedding-0.6B-GGUF
+    local_dir: gguf/qwen3-embedding-0.6b
+    format: gguf
+    include: "*Q8_0.gguf"
+    enabled: true
+    phase: embedding
+    backend: llamacpp
+    proxy_name: embedding-model
+    endpoint: true
+    api_port: 8003           # Embedding server port (overrides backend default)
+
+  # ── Phase P0: Ultra-Light (0.6B) ────────────────────────────
+  - name: qwen0.5b
+    repo_id: Qwen/Qwen2.5-0.5B-Instruct
+    local_dir: hf/qwen2.5-0.6b
+    format: hf
+    enabled: true
+    phase: p0
+    backend: vllm
+    proxy_name: qwen0.5b-vllm
+    endpoint: true
+    vllm_tp: 1
+    vllm_gpu_mem: "0.15"
+    vllm_max_seqs: 64
+
+  - name: qwen0.5b-gguf
+    repo_id: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-0.6b
+    format: gguf
+    include: "*q4_k_m.gguf"
+    enabled: true
+    phase: p0
+    backend: llamacpp
+    proxy_name: qwen0.5b-llamacpp
+    endpoint: true
+
+  # ── Phase P1: Light (7B) ────────────────────────────────────
+  - name: llama3.1-8b
+    repo_id: meta-llama/Llama-3.1-8B-Instruct
+    local_dir: hf/llama3.1-8b
+    format: hf
+    enabled: false
+    phase: p1
+    backend: vllm
+    proxy_name: llama3.1-8b-vllm
+    endpoint: true
+    vllm_tp: 1
+    vllm_gpu_mem: "0.30"
+    vllm_max_seqs: 64
+    # NOTE: Requires Meta approval. Run: hf auth login
+    # Enable after approval: set enabled: true
+
+  - name: qwen7b
+    repo_id: Qwen/Qwen2.5-7B-Instruct
+    local_dir: hf/qwen2.5-7b
+    format: hf
+    enabled: true
+    phase: p1
+    backend: vllm
+    proxy_name: qwen7b-vllm
+    endpoint: true
+    vllm_tp: 1
+    vllm_gpu_mem: "0.87"
+    vllm_max_seqs: 64
+
+  - name: qwen7b-gguf
+    repo_id: Qwen/Qwen2.5-7B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-7b
+    format: gguf
+    include: "*q4_k_m*"
+    enabled: true
+    phase: p1
+    backend: llamacpp
+    proxy_name: qwen7b-llamacpp
+    endpoint: true
+
+  # ── Phase P2: Medium (14B) ──────────────────────────────────
+  - name: qwen14b
+    repo_id: Qwen/Qwen2.5-14B-Instruct
+    local_dir: hf/qwen2.5-14b
+    format: hf
+    enabled: false
+    phase: p2
+    backend: vllm
+    proxy_name: qwen14b-vllm
+    endpoint: true
+    vllm_tp: 1
+    vllm_gpu_mem: "0.87"
+    vllm_max_seqs: 64
+
+  - name: qwen14b-gguf
+    repo_id: Qwen/Qwen2.5-14B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-14b
+    format: gguf
+    include: "*q4_k_m*"
+    enabled: true
+    phase: p2
+    backend: llamacpp
+    proxy_name: qwen14b-llamacpp
+    endpoint: true
+
+  # ── Phase P3: Heavy (32B AWQ) ───────────────────────────────
+  - name: qwen32b-awq
+    repo_id: Qwen/Qwen2.5-32B-Instruct-AWQ
+    local_dir: hf/qwen2.5-32b-awq
+    format: hf
+    enabled: true
+    phase: p3
+    backend: vllm
+    proxy_name: qwen32b-vllm
+    endpoint: true
+    # 32B AWQ int4 ≈ 20GB, fits on single 48GB GPU
+    vllm_tp: 1
+    vllm_gpu_mem: "0.87"
+    vllm_quant: awq
+    vllm_max_seqs: 256
+
+  - name: qwen32b-gguf
+    repo_id: Qwen/Qwen2.5-32B-Instruct-GGUF
+    local_dir: gguf/qwen2.5-32b
+    format: gguf
+    include: "qwen2.5-32b-instruct-q4_k_m*"
+    enabled: true
+    phase: p3
+    backend: llamacpp
+    proxy_name: qwen32b-llamacpp
+    endpoint: true
