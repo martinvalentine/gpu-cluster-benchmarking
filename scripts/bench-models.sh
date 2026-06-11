@@ -20,17 +20,32 @@ For each enabled model:
 
 OPTIONS:
   -o, --output DIR        Results root directory (default: ./results)
-  -p, --phase PHASE       Run specific phase: p0, p1, p2, p3, all (default: all)
+  -p, --phase PHASE       Run specific model phase: p0, p1, p2, p3, all (default: all)
+  -b, --backend BACKEND   Filter by backend: vllm, llamacpp (can repeat, default: all)
   -m, --model NAME        Run specific model by name (can repeat)
+  --bench-phase PHASE     Benchmark load level: p0, p1, p2, p3, all (default: all)
+                          p0=smoke, p1=light, p2=medium, p3=heavy
+  --bench-type TYPE       Benchmark type: phases, stress (default: phases)
+                          phases = fixed concurrency per phase
+                          stress = incremental concurrency ramp
+  --conc-base N           Stress mode starting concurrency (default: 1)
+  --conc-step N           Stress mode increment per round (default: 100)
+  --conc-max N            Stress mode maximum concurrency (default: 2000)
   --skip-health-check     Skip pre-flight health checks
   -y, --yes               Auto-accept prompts (for CI / non-interactive use)
   --dry-run               Show what would be run without executing
   -h, --help              Show this help
 
 EXAMPLES:
-  $(basename "$0")                                    # All enabled models
-  $(basename "$0") -p p0                              # P0 phase models only
+  $(basename "$0")                                    # All models, all bench phases
+  $(basename "$0") -p p0                              # P0 models only
+  $(basename "$0") -b vllm                            # Only vLLM backends
+  $(basename "$0") -b llamacpp                        # Only llama.cpp backends
   $(basename "$0") -m qwen0.5b                        # Specific model (all backends)
+  $(basename "$0") --bench-phase p1                   # All models, light load only
+  $(basename "$0") -p p1 --bench-phase p1             # P1 models, light load only
+  $(basename "$0") --bench-type stress                # Incremental stress: 1→100→200→...→2000
+  $(basename "$0") --bench-type stress --conc-base 50 --conc-step 50 --conc-max 500
   $(basename "$0") --dry-run                          # Preview actions
 
 OUTPUT STRUCTURE:
@@ -52,6 +67,12 @@ EOF
 }
 
 PHASE="all"
+BACKEND_FILTER=()
+BENCH_PHASE="all"
+BENCH_TYPE="phases"
+CONC_BASE=1
+CONC_STEP=100
+CONC_MAX=2000
 AUTO_YES=0
 SKIP_HEALTH=0
 DRY_RUN=0
@@ -61,7 +82,13 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -o|--output)            RESULTS_DIR="$2"; shift 2 ;;
         -p|--phase)             PHASE="$2"; shift 2 ;;
+        -b|--backend)           BACKEND_FILTER+=("$2"); shift 2 ;;
         -m|--model)             SELECTED_MODELS+=("$2"); shift 2 ;;
+        --bench-phase)          BENCH_PHASE="$2"; shift 2 ;;
+        --bench-type)           BENCH_TYPE="$2"; shift 2 ;;
+        --conc-base)            CONC_BASE="$2"; shift 2 ;;
+        --conc-step)            CONC_STEP="$2"; shift 2 ;;
+        --conc-max)             CONC_MAX="$2"; shift 2 ;;
         --skip-health-check)    SKIP_HEALTH=1; shift ;;
         -y|--yes)               AUTO_YES=1; shift ;;
         --dry-run)              DRY_RUN=1; shift ;;
@@ -80,9 +107,9 @@ NC='\033[0m'
 
 log()    { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG_FILE"; }
 header() { echo -e "\n${GREEN}${BOLD}═══ $* ═══${NC}\n" | tee -a "$LOG_FILE"; }
-ok()     { echo -e "  ${GREEN}✓${NC} $*"; }
-warn()   { echo -e "  ${YELLOW}⚠${NC} $*"; }
-fail()   { echo -e "  ${RED}✗${NC} $*"; }
+ok()     { echo -e "  ${GREEN}✓${NC} $*" | tee -a "$LOG_FILE"; }
+warn()   { echo -e "  ${YELLOW}⚠${NC} $*" | tee -a "$LOG_FILE"; }
+fail()   { echo -e "  ${RED}✗${NC} $*" | tee -a "$LOG_FILE"; }
 
 # ── Parse models from YAML ──────────────────────────────────────
 parse_models() {
@@ -150,12 +177,13 @@ for m in models:
 
     # Per-model vLLM config (override cluster defaults)
     vllm_tp = m.get("vllm_tp", vllm_defaults.get("tp", 1))
-    vllm_gpu_mem = m.get("vllm_gpu_mem", vllm_defaults.get("gpu_mem_util", "0.87"))
+    vllm_gpu_mem = m.get("vllm_gpu_mem", vllm_defaults.get("gpu_mem_util", "0.92"))
     vllm_quant = m.get("vllm_quant", vllm_defaults.get("quant", "none"))
-    vllm_max_seqs = m.get("vllm_max_seqs", vllm_defaults.get("max_num_seqs", 64))
+    vllm_max_seqs = m.get("vllm_max_seqs", vllm_defaults.get("max_num_seqs", 512))
     vllm_max_model_len = vllm_defaults.get("max_model_len", 4096)
-    vllm_max_batched_tokens = vllm_defaults.get("max_batched_tokens", 8192)
-    vllm_swap_space = vllm_defaults.get("swap_space", 4)
+    vllm_max_batched_tokens = vllm_defaults.get("max_batched_tokens", 16384)
+    vllm_block_size = vllm_defaults.get("block_size", 16)
+    vllm_dtype = vllm_defaults.get("dtype", "auto")
 
     # Per-model llama.cpp config (override cluster defaults)
     llama_np = m.get("llamacpp_n_parallel", llamacpp_defaults.get("n_parallel", 4))
@@ -178,8 +206,8 @@ for m in models:
     if backend == "vllm" and int(vllm_tp) > gpu_count:
         skip = f"SKIP:tp>{gpu_count}"
 
-    # Output: name|backend|model_path|phase|vllm_tp|vllm_gpu_mem|vllm_quant|vllm_max_seqs|gpu_count|skip|max_model_len|max_batched_tokens|swap_space|llama_np|llama_ctx|llama_ngl|llama_batch|llama_ubatch|llama_threads|llama_ctk|llama_ctv|llama_fa|llama_cp
-    print(f"{name}|{backend}|{model_path}|{m_phase}|{vllm_tp}|{vllm_gpu_mem}|{vllm_quant}|{vllm_max_seqs}|{gpu_count}|{skip}|{vllm_max_model_len}|{vllm_max_batched_tokens}|{vllm_swap_space}|{llama_np}|{llama_ctx}|{llama_ngl}|{llama_batch}|{llama_ubatch}|{llama_threads}|{llama_ctk}|{llama_ctv}|{llama_fa}|{llama_cp}")
+    # Output: name|backend|model_path|phase|vllm_tp|vllm_gpu_mem|vllm_quant|vllm_max_seqs|gpu_count|skip|max_model_len|max_batched_tokens|block_size|dtype|llama_np|llama_ctx|llama_ngl|llama_batch|llama_ubatch|llama_threads|llama_ctk|llama_ctv|llama_fa|llama_cp
+    print(f"{name}|{backend}|{model_path}|{m_phase}|{vllm_tp}|{vllm_gpu_mem}|{vllm_quant}|{vllm_max_seqs}|{gpu_count}|{skip}|{vllm_max_model_len}|{vllm_max_batched_tokens}|{vllm_block_size}|{vllm_dtype}|{llama_np}|{llama_ctx}|{llama_ngl}|{llama_batch}|{llama_ubatch}|{llama_threads}|{llama_ctk}|{llama_ctv}|{llama_fa}|{llama_cp}")
 
 # Output dataset path as first line
 dataset_cfg = cfg.get("dataset", {})
@@ -202,39 +230,120 @@ wait_for_server() {
     return 1
 }
 
-# ── Kill server on port ─────────────────────────────────────────
-kill_server_on_port() {
-    local port=$1
+# ── Kill server processes ──────────────────────────────────────
+kill_process_tree() {
+    local pid=$1
+    local sig=${2:-TERM}
+    local children
+    children=$(ps -o pid= --ppid "$pid" 2>/dev/null || true)
+    for child in $children; do
+        kill_process_tree "$child" "$sig"
+    done
+    kill -"$sig" "$pid" 2>/dev/null || true
+}
+
+get_tmux_pane_pids() {
+    local session=$1
+    tmux list-panes -t "$session" -F '#{pane_pid}' 2>/dev/null || true
+}
+
+kill_tmux_session() {
+    local session=$1
     local pids
-    pids=$(lsof -ti :"$port" 2>/dev/null || true)
+    pids=$(get_tmux_pane_pids "$session")
     if [[ -n "$pids" ]]; then
+        log "  Killing process trees for tmux session '$session': $pids"
         for pid in $pids; do
-            # Kill entire process tree (parent + children like VLLM::EngineCore)
-            kill -- -"$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+            kill_process_tree "$pid" TERM
         done
-        sleep 2
-        # Force kill anything still on the port
-        pids=$(lsof -ti :"$port" 2>/dev/null || true)
-        for pid in $pids; do
-            kill -9 -- -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
-        done
+        sleep 1
+        # Force kill any survivors
+        pids=$(get_tmux_pane_pids "$session")
+        if [[ -n "$pids" ]]; then
+            for pid in $pids; do
+                kill_process_tree "$pid" KILL
+            done
+        fi
     fi
-    # Also kill any VLLM::EngineCore processes
-    pkill -f "VLLM::EngineCore" 2>/dev/null || true
+    tmux kill-session -t "$session" 2>/dev/null || true
+}
+
+kill_server_by_name() {
+    local fw=$1
+    if [[ "$fw" == "vllm" ]]; then
+        pkill -f "VLLM::EngineCore" 2>/dev/null || true
+        pkill -f "vllm serve " 2>/dev/null || true
+    elif [[ "$fw" == "llamacpp" ]]; then
+        pkill -f "llama-server" 2>/dev/null || true
+    fi
+}
+
+wait_for_process_exit() {
+    local name=$1 timeout=${2:-5}
+    local elapsed=0
+    while [[ $elapsed -lt $timeout ]]; do
+        if ! pgrep -f "$name" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    return 1
+}
+
+force_kill_by_name() {
+    local pattern=$1
+    local pids
+    pids=$(pgrep -f "$pattern" 2>/dev/null || true)
+    if [[ -n "$pids" ]]; then
+        log "  Force-killing processes matching '$pattern': $pids"
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+    fi
+}
+
+# ── Wait for GPU memory to be released ─────────────────────────
+wait_gpu_free() {
+    local min_free_mb=${1:-5000}
+    local timeout=${2:-30}
+    local elapsed=0
+
+    if ! command -v nvidia-smi &>/dev/null; then
+        return 0
+    fi
+
+    while [[ $elapsed -lt $timeout ]]; do
+        local free_mb
+        free_mb=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null \
+            | sort -n | tail -1 | tr -d ' ' || echo "0")
+        if [[ "$free_mb" -ge "$min_free_mb" ]]; then
+            return 0
+        fi
+        log "  GPU memory: ${free_mb} MiB free (need ${min_free_mb} MiB), waiting..."
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+
+    warn "GPU memory still low after ${timeout}s (${free_mb} MiB free), proceeding anyway"
+    return 0
 }
 
 # ── Start vLLM server ───────────────────────────────────────────
 start_vllm() {
-    local model_path=$1 port=$2 tp=${3:-1} gpu_mem=${4:-0.87} quant=${5:-none} max_seqs=${6:-64}
-    local max_model_len=${7:-4096} max_batched_tokens=${8:-8192} swap_space=${9:-4}
-    log "Starting vLLM: model=$model_path port=$port tp=$tp gpu_mem=$gpu_mem quant=$quant max_seqs=$max_seqs"
+    local model_path=$1 port=$2 tp=${3:-6} gpu_mem=${4:-0.92} quant=${5:-none} max_seqs=${6:-512}
+    local max_model_len=${7:-4096} max_batched_tokens=${8:-16384} block_size=${9:-16} dtype=${10:-auto}
+    log "Starting vLLM: model=$model_path port=$port tp=$tp gpu_mem=$gpu_mem quant=$quant max_seqs=$max_seqs block=$block_size dtype=$dtype"
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log "  [DRY-RUN] Would start: vllm serve $model_path --port $port --tp $tp --gpu-mem $gpu_mem --quant $quant --max-seqs $max_seqs --max-model-len $max_model_len --max-batched-tokens $max_batched_tokens"
+        log "  [DRY-RUN] Would start: vllm serve $model_path --port $port --tp $tp --gpu-mem $gpu_mem --quant $quant --max-seqs $max_seqs --max-model-len $max_model_len --max-batched-tokens $max_batched_tokens --block-size $block_size --dtype $dtype"
         return 0
     fi
 
-    kill_server_on_port "$port"
+    kill_tmux_session "bench-vllm"
+    kill_server_by_name "vllm"
+    if ! wait_for_process_exit "vllm serve " 3; then
+        force_kill_by_name "VLLM::EngineCore"
+        force_kill_by_name "vllm serve "
+    fi
 
     local vllm_bin="${PROJECT_ROOT}/.venv/bin/vllm"
     if [[ ! -f "$vllm_bin" ]]; then
@@ -250,6 +359,8 @@ start_vllm() {
         quant_args=(--quantization "$quant")
     fi
 
+    wait_gpu_free 5000 30
+
     tmux new-session -d -s "bench-vllm" -n "serve" \
         "VLLM_USE_FLASHINFER_SAMPLER=0 $vllm_bin serve $model_path \
             --host 0.0.0.0 --port $port \
@@ -260,8 +371,10 @@ start_vllm() {
             --enable-prefix-caching \
             --enable-chunked-prefill \
             --max-num-batched-tokens $max_batched_tokens \
+            --block-size $block_size \
+            --dtype $dtype \
             --trust-remote-code \
-            --enforce-eager ${quant_args[@]:-} 2>&1 | tee /tmp/bench_vllm.log; sleep infinity"
+            ${quant_args[@]:-} 2>&1 | tee /tmp/bench_vllm.log; sleep infinity"
 
     log "  Waiting for vLLM to be ready..."
     if wait_for_server "vLLM" "http://localhost:$port/v1/models" 120; then
@@ -285,7 +398,11 @@ start_llamacpp() {
         return 0
     fi
 
-    kill_server_on_port "$port"
+    kill_tmux_session "bench-llamacpp"
+    kill_server_by_name "llamacpp"
+    if ! wait_for_process_exit "llama-server" 3; then
+        force_kill_by_name "llama-server"
+    fi
 
     local llama_bin="${PROJECT_ROOT}/third_party/llama-cpp-turboquant/build/bin/llama-server"
     if [[ ! -f "$llama_bin" ]]; then
@@ -314,7 +431,9 @@ start_llamacpp() {
         cp_flag="--no-cache-prompt"
     fi
 
-    tmux new-session -d -s "bench-llama" -n "serve" \
+    wait_gpu_free 5000 30
+
+    tmux new-session -d -s "bench-llamacpp" -n "serve" \
         "cd $PROJECT_ROOT && $llama_bin \
             -m $model_path \
             --host 0.0.0.0 --port $port \
@@ -337,18 +456,36 @@ start_llamacpp() {
 
 # ── Stop server ─────────────────────────────────────────────────
 stop_server() {
-    local fw=$1 port=$2
+    local fw=$1
     if [[ $DRY_RUN -eq 1 ]]; then
-        log "  [DRY-RUN] Would stop $fw on port $port"
+        log "  [DRY-RUN] Would stop $fw"
         return 0
     fi
 
-    log "  Stopping $fw on port $port..."
-    kill_server_on_port "$port"
+    log "  Stopping $fw..."
 
     local session="bench-${fw}"
-    tmux kill-session -t "$session" 2>/dev/null || true
+
+    # Kill tmux session and all its child process trees
+    kill_tmux_session "$session"
+
+    # Kill remaining server processes by name pattern
+    kill_server_by_name "$fw"
+
+    # Wait briefly, then force-kill any survivors
+    if ! wait_for_process_exit "bench-${fw}" 3; then
+        if [[ "$fw" == "vllm" ]]; then
+            force_kill_by_name "VLLM::EngineCore"
+            force_kill_by_name "vllm serve "
+        elif [[ "$fw" == "llamacpp" ]]; then
+            force_kill_by_name "llama-server"
+        fi
+    fi
+
+    sleep 1
     ok "$fw stopped"
+
+    wait_gpu_free 5000 60
 }
 
 # ── Run benchmark ───────────────────────────────────────────────
@@ -371,15 +508,44 @@ run_benchmark() {
     mkdir -p "$results_dir"
 
     if [[ "$fw" == "vllm" ]]; then
-        VLLM_RESULTS_DIR="$results_dir" \
-        VLLM_BENCH_URL="http://localhost:$port" \
-        VLLM_BENCH_MODEL="$model_path" \
-        VLLM_BENCH_DATASET_PATH="$DATASET_PATH" \
-        "$bench_script" -p "$PHASE" 2>&1 | tee -a "$LOG_FILE"
+        if [[ "$BENCH_TYPE" == "stress" ]]; then
+            local stress_script="${PROJECT_ROOT}/scripts/benchmark/bench-vllm-stress.sh"
+            if [[ ! -f "$stress_script" ]]; then
+                warn "Stress benchmark script not found: $stress_script"
+                return 1
+            fi
+            VLLM_RESULTS_DIR="$results_dir" \
+            VLLM_BENCH_URL="http://localhost:$port" \
+            VLLM_BENCH_MODEL="$model_path" \
+            VLLM_BENCH_DATASET_PATH="$DATASET_PATH" \
+            VLLM_CONC_BASE="$CONC_BASE" \
+            VLLM_CONC_STEP="$CONC_STEP" \
+            VLLM_CONC_MAX="$CONC_MAX" \
+            "$stress_script" 2>&1 | tee -a "$LOG_FILE"
+        else
+            VLLM_RESULTS_DIR="$results_dir" \
+            VLLM_BENCH_URL="http://localhost:$port" \
+            VLLM_BENCH_MODEL="$model_path" \
+            VLLM_BENCH_DATASET_PATH="$DATASET_PATH" \
+            "$bench_script" -p "$BENCH_PHASE" 2>&1 | tee -a "$LOG_FILE"
+        fi
     elif [[ "$fw" == "llamacpp" ]]; then
+        # Map bench-phase to llamacpp concurrency levels
+        local llama_conc=""
+        case "$BENCH_PHASE" in
+            p0) llama_conc="1" ;;
+            p1) llama_conc="1 4" ;;
+            p2) llama_conc="1 4 8" ;;
+            p3) llama_conc="1 4 8 16" ;;
+            *)  llama_conc="" ;;  # use script default
+        esac
+        local conc_args=()
+        if [[ -n "$llama_conc" ]]; then
+            conc_args=(-c "$llama_conc")
+        fi
         LLAMA_RESULTS_DIR="$results_dir" \
         LLAMA_BENCH_URL="http://localhost:$port/v1" \
-        "$bench_script" 2>&1 | tee -a "$LOG_FILE"
+        "$bench_script" ${conc_args[@]:-} 2>&1 | tee -a "$LOG_FILE"
     fi
 }
 
@@ -393,6 +559,11 @@ echo -e "  ${GREEN}${BOLD}  Per-Model Benchmark Orchestrator${NC}"
 echo -e "  ${GREEN}${BOLD}══════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${CYAN}Phase${NC}        $PHASE"
+echo -e "  ${CYAN}Bench Phase${NC} $BENCH_PHASE"
+echo -e "  ${CYAN}Bench Type${NC}  $BENCH_TYPE"
+if [[ "$BENCH_TYPE" == "stress" ]]; then
+echo -e "  ${CYAN}Conc range${NC}  ${CONC_BASE} → ${CONC_MAX} (step ${CONC_STEP})"
+fi
 echo -e "  ${CYAN}Results${NC}      $RESULTS_DIR"
 echo -e "  ${CYAN}Config${NC}       $YAML_CONFIG"
 [[ $DRY_RUN -eq 1 ]] && echo -e "  ${YELLOW}Mode${NC}         DRY-RUN"
@@ -420,11 +591,18 @@ fi
 
 log "Found ${#MODEL_LINES[@]} model(s) to benchmark:"
 for line in "${MODEL_LINES[@]}"; do
-    IFS='|' read -r name backend model_path m_phase vllm_tp vllm_gpu_mem vllm_quant vllm_max_seqs gpu_count skip vllm_max_model_len vllm_max_batched_tokens vllm_swap_space llama_np llama_ctx llama_ngl llama_batch llama_ubatch llama_threads llama_ctk llama_ctv llama_fa llama_cp <<< "$line"
+    IFS='|' read -r name backend model_path m_phase vllm_tp vllm_gpu_mem vllm_quant vllm_max_seqs gpu_count skip vllm_max_model_len vllm_max_batched_tokens vllm_block_size vllm_dtype llama_np llama_ctx llama_ngl llama_batch llama_ubatch llama_threads llama_ctk llama_ctv llama_fa llama_cp <<< "$line"
+    if [[ ${#BACKEND_FILTER[@]} -gt 0 ]]; then
+        match=0
+        for bf in "${BACKEND_FILTER[@]}"; do
+            if [[ "$backend" == "$bf" ]]; then match=1; break; fi
+        done
+        [[ $match -eq 0 ]] && continue
+    fi
     if [[ -n "$skip" ]]; then
         warn "  - $name (backend=$backend, phase=$m_phase, tp=$vllm_tp) — $skip (pod has $gpu_count GPU(s))"
     elif [[ "$backend" == "vllm" ]]; then
-        log "  - $name (vllm): tp=$vllm_tp gpu_mem=$vllm_gpu_mem quant=$vllm_quant max_seqs=$vllm_max_seqs max_model_len=$vllm_max_model_len"
+        log "  - $name (vllm): tp=$vllm_tp gpu_mem=$vllm_gpu_mem quant=$vllm_quant max_seqs=$vllm_max_seqs block=$vllm_block_size dtype=$vllm_dtype"
     else
         log "  - $name (llamacpp): np=$llama_np ctx=$llama_ctx ngl=$llama_ngl batch=$llama_batch ubatch=$llama_ubatch ctk=$llama_ctk ctv=$llama_ctv fa=$llama_fa cache_prompt=$llama_cp"
     fi
@@ -439,8 +617,23 @@ SKIPPED=0
 FAILED_LIST=()
 
 for line in "${MODEL_LINES[@]}"; do
-    IFS='|' read -r name backend model_path m_phase vllm_tp vllm_gpu_mem vllm_quant vllm_max_seqs gpu_count skip vllm_max_model_len vllm_max_batched_tokens vllm_swap_space llama_np llama_ctx llama_ngl llama_batch llama_ubatch llama_threads llama_ctk llama_ctv llama_fa llama_cp <<< "$line"
+    IFS='|' read -r name backend model_path m_phase vllm_tp vllm_gpu_mem vllm_quant vllm_max_seqs gpu_count skip vllm_max_model_len vllm_max_batched_tokens vllm_block_size vllm_dtype llama_np llama_ctx llama_ngl llama_batch llama_ubatch llama_threads llama_ctk llama_ctv llama_fa llama_cp <<< "$line"
     RUN_NUM=$((RUN_NUM + 1))
+
+    # Skip models not matching backend filter
+    if [[ ${#BACKEND_FILTER[@]} -gt 0 ]]; then
+        match=0
+        for bf in "${BACKEND_FILTER[@]}"; do
+            if [[ "$backend" == "$bf" ]]; then
+                match=1
+                break
+            fi
+        done
+        if [[ $match -eq 0 ]]; then
+            continue
+        fi
+    fi
+
     TOTAL=$((TOTAL + 1))
 
     # Skip models that need more GPUs than available
@@ -462,7 +655,7 @@ for line in "${MODEL_LINES[@]}"; do
 
     # Start server
     if [[ "$backend" == "vllm" ]]; then
-        if ! start_vllm "$model_path" "$PORT" "$vllm_tp" "$vllm_gpu_mem" "$vllm_quant" "$vllm_max_seqs" "$vllm_max_model_len" "$vllm_max_batched_tokens" "$vllm_swap_space"; then
+        if ! start_vllm "$model_path" "$PORT" "$vllm_tp" "$vllm_gpu_mem" "$vllm_quant" "$vllm_max_seqs" "$vllm_max_model_len" "$vllm_max_batched_tokens" "$vllm_block_size" "$vllm_dtype"; then
             FAILED_LIST+=("$name")
             continue
         fi
@@ -488,7 +681,7 @@ for line in "${MODEL_LINES[@]}"; do
     fi
 
     # Stop server
-    stop_server "$backend" "$PORT"
+    stop_server "$backend"
     echo ""
 done
 
