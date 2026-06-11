@@ -35,6 +35,7 @@ Runs end-to-end benchmarks for all enabled models, starting/stopping servers bet
 |------|---------|-------------|
 | `-o, --output DIR` | `./results` | Results root directory |
 | `-p, --phase PHASE` | `all` | Phase: p0, p1, p2, p3, all |
+| `-b, --backend BACKEND` | all | Backend filter: vllm, llamacpp (can repeat) |
 | `-m, --model NAME` | all enabled | Specific model (can repeat) |
 | `--skip-health-check` | | Skip pre-flight health checks |
 | `-y, --yes` | | Auto-accept prompts (CI) |
@@ -48,6 +49,16 @@ Runs end-to-end benchmarks for all enabled models, starting/stopping servers bet
 
 # P0 models only
 ./scripts/bench-models.sh -p p0
+
+# Only vLLM backends
+./scripts/bench-models.sh -b vllm
+
+# Only llama.cpp backends
+./scripts/bench-models.sh -b llamacpp
+
+# Combine filters
+./scripts/bench-models.sh -p p0 -b llamacpp
+./scripts/bench-models.sh -b llamacpp -m qwen0.5b-gguf
 
 # Specific model
 ./scripts/bench-models.sh -m qwen32b-awq
@@ -64,6 +75,8 @@ Runs end-to-end benchmarks for all enabled models, starting/stopping servers bet
 1. Starts vLLM with HF model → runs vLLM benchmarks → stops server
 2. Starts llama.cpp with GGUF model → runs llama.cpp benchmarks → stops server
 3. Results saved to `results/run-N/{vllm,llamacpp}/`
+
+Use `-b vllm` or `-b llamacpp` to run only one backend at a time.
 
 **Auto-skip:** Models with `vllm_tp > gpu_count` are automatically skipped.
 

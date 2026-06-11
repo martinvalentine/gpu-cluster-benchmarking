@@ -97,8 +97,10 @@ uv run python scripts/download-models.py
 # 7. Run all benchmarks (per-model loop, reads configs/models.yaml)
 ./scripts/bench-models.sh
 
-# 8. Or run specific phase/model
+# 8. Or run specific phase/model/backend
 ./scripts/bench-models.sh -p p0            # P0 models only
+./scripts/bench-models.sh -b vllm          # vLLM backends only
+./scripts/bench-models.sh -b llamacpp      # llama.cpp backends only
 ./scripts/bench-models.sh -m qwen32b-awq   # Specific model
 ./scripts/bench-models.sh --dry-run        # Preview actions
 ```
