@@ -71,7 +71,7 @@ conflicts = [
         { group = "sglang" },
     ],
 ]
-extra-build-dependencies = { vllm = ["setuptools", "torch", "ninja", "packaging"], sglang = ["setuptools", "torch"] }
+extra-build-dependencies = { vllm = ["setuptools", "setuptools_rust", "setuptools_scm", "torch", "ninja", "packaging"], sglang = ["setuptools", "torch"] }
 
 
 [tool.uv.sources]
