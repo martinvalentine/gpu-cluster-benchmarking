@@ -19,6 +19,7 @@ RESULTS_DIR="${VLLM_RESULTS_DIR:-${PROJECT_ROOT}/results/vllm}"
 DATASET="${VLLM_BENCH_DATASET:-sharegpt}"
 DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-}"
 VLLM_BIN="${VLLM_BIN:-$(command -v vllm 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/vllm")}"
+MAX_SEQS="${VLLM_BENCH_MAX_SEQS:-512}"
 
 usage() {
     cat <<EOF
@@ -72,7 +73,11 @@ run_bench() {
     local phase_name=$1
     local model=$2
     local conc=$3
+    # Scale num_prompts: at least conc*8, but cap at MAX_SEQS to match server capacity
     local num_prompts=$((conc * 8))
+    if [[ "$num_prompts" -gt "$MAX_SEQS" ]]; then
+        num_prompts="$MAX_SEQS"
+    fi
     local outfile="${RESULTS_DIR}/${phase_name}_conc${conc}.json"
 
     echo "[$(date +%H:%M:%S)] ${phase_name} conc=${conc} num_prompts=${num_prompts}"

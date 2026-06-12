@@ -18,6 +18,7 @@ RESULTS_DIR="${VLLM_RESULTS_DIR:-${PROJECT_ROOT}/results/vllm}"
 DATASET="${VLLM_BENCH_DATASET:-sharegpt}"
 DATASET_PATH="${VLLM_BENCH_DATASET_PATH:-}"
 VLLM_BIN="${VLLM_BIN:-$(command -v vllm 2>/dev/null || echo "${PROJECT_ROOT}/.venv/bin/vllm")}"
+MAX_SEQS="${VLLM_BENCH_MAX_SEQS:-512}"
 
 CONC_BASE="${VLLM_CONC_BASE:-1}"
 CONC_STEP="${VLLM_CONC_STEP:-100}"
@@ -85,7 +86,11 @@ echo ""
 
 run_bench() {
     local conc=$1
+    # Scale num_prompts: at least conc*8, but cap at MAX_SEQS to match server capacity
     local num_prompts=$((conc * 8))
+    if [[ "$num_prompts" -gt "$MAX_SEQS" ]]; then
+        num_prompts="$MAX_SEQS"
+    fi
     local outfile="${RESULTS_DIR}/stress_conc${conc}.json"
 
     echo -e "[$(date +%H:%M:%S)] ${CYAN}conc=${conc}${NC} num_prompts=${num_prompts}"

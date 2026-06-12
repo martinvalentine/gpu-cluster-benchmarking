@@ -28,6 +28,7 @@ OPTIONS:
   -n, --ccu N             Concurrent slots / CCU (default: 4)
   -c, --context N         Total context size (default: 4096)
   -ng, --gpu-layers N     GPU layers offload: number or 'all' (default: all)
+  -ts, --tensor-split S   Comma-separated GPU split ratios (e.g. "1,1,1,1,1,1" for 6 GPUs)
   -b, --batch N           Batch size for prefill (default: 2048)
   -ub, --ubatch N         Micro-batch size (default: 512)
   -t, --threads N         CPU threads (default: nproc)
@@ -52,7 +53,7 @@ EXAMPLES:
 
 ENV OVERRIDES (lower priority than flags):
   LLAMA_PORT, LLAMA_HOST, LLAMA_N_PARALLEL, LLAMA_CTX_SIZE,
-  LLAMA_N_GPU_LAYERS, LLAMA_BATCH, LLAMA_UBATCH, LLAMA_THREADS,
+  LLAMA_N_GPU_LAYERS, LLAMA_TENSOR_SPLIT, LLAMA_BATCH, LLAMA_UBATCH, LLAMA_THREADS,
   LLAMA_FLASH_ATTN, LLAMA_CACHE_PROMPT, LLAMA_CACHE_KEY, LLAMA_CACHE_VAL
 EOF
     exit 0
@@ -68,6 +69,7 @@ N_GPU_LAYERS="${LLAMA_N_GPU_LAYERS:-all}"
 N_BATCH="${LLAMA_BATCH:-4096}"
 N_UBATCH="${LLAMA_UBATCH:-1024}"
 N_THREADS="${LLAMA_THREADS:-60}"
+TENSOR_SPLIT="${LLAMA_TENSOR_SPLIT:-}"
 FLASH_ATTN="${LLAMA_FLASH_ATTN:-on}"
 CACHE_KEY="${LLAMA_CACHE_KEY:-q8_0}"
 CACHE_VAL="${LLAMA_CACHE_VAL:-turbo4}"
@@ -80,6 +82,7 @@ while [[ $# -gt 0 ]]; do
         -n|--ccu)           N_PARALLEL="$2"; shift 2 ;;
         -c|--context)       CTX_SIZE="$2"; shift 2 ;;
         -ng|--gpu-layers)   N_GPU_LAYERS="$2"; shift 2 ;;
+        -ts|--tensor-split) TENSOR_SPLIT="$2"; shift 2 ;;
         -b|--batch)         N_BATCH="$2"; shift 2 ;;
         -ub|--ubatch)       N_UBATCH="$2"; shift 2 ;;
         -t|--threads)       N_THREADS="$2"; shift 2 ;;
@@ -153,6 +156,19 @@ row "CPU"        "${CPU_NAME}"
 echo -e "  ${YELLOW}${BOLD}══════════════════════════════════════════════════${NC}"
 echo ""
 
+# Auto-detect GPU count for tensor-split if not set and offloading all layers
+RESOLVED_TENSOR_SPLIT="$TENSOR_SPLIT"
+if [[ -z "$RESOLVED_TENSOR_SPLIT" && ("$N_GPU_LAYERS" == "all" || "$N_GPU_LAYERS" == "999") ]]; then
+    if command -v nvidia-smi &>/dev/null; then
+        gpu_count=$(nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l || echo "1")
+        if [[ "$gpu_count" -gt 1 ]]; then
+            RESOLVED_TENSOR_SPLIT=$(printf '%0.s1,' $(seq 1 "$gpu_count"))
+            RESOLVED_TENSOR_SPLIT="${RESOLVED_TENSOR_SPLIT%,}"
+            echo -e "  ${YELLOW}Auto-detected $gpu_count GPUs → tensor-split=$RESOLVED_TENSOR_SPLIT${NC}"
+        fi
+    fi
+fi
+
 exec "$BINARY" \
     -m "$MODEL" \
     --host "$HOST" \
@@ -166,4 +182,5 @@ exec "$BINARY" \
     -fa "$FLASH_ATTN" \
     -ctk "$CACHE_KEY" \
     -ctv "$CACHE_VAL" \
+    ${RESOLVED_TENSOR_SPLIT:+--tensor-split "$RESOLVED_TENSOR_SPLIT"} \
     $( [[ "$CACHE_PROMPT" == "1" ]] && echo "--cache-prompt" || echo "--no-cache-prompt" )
