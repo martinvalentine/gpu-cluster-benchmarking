@@ -228,9 +228,20 @@ wait_for_server() {
         if curl -sf "$url" >/dev/null 2>&1; then
             return 0
         fi
-        if [[ -n "$proc_pattern" ]] && ! pgrep -f "$proc_pattern" >/dev/null 2>&1; then
-            log "  $name process died — check /tmp/bench_*.log for details"
-            return 1
+        if [[ -n "$proc_pattern" ]]; then
+            local found=0
+            while IFS= read -r pid; do
+                local cmd
+                cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+                if [[ "$cmd" != *"tmux"* ]]; then
+                    found=1
+                    break
+                fi
+            done < <(pgrep -f "$proc_pattern" 2>/dev/null)
+            if [[ $found -eq 0 ]]; then
+                log "  $name process died — check /tmp/bench_*.log for details"
+                return 1
+            fi
         fi
         sleep 2
         elapsed=$((elapsed + 2))
@@ -402,7 +413,11 @@ start_vllm() {
 
     local swap_str=""
     if [[ -n "$swap_space" && "$swap_space" -gt 0 ]]; then
-        swap_str="--swap-space $swap_space"
+        if $vllm_bin serve --help=all 2>/dev/null | grep -q "swap-space"; then
+            swap_str="--swap-space $swap_space"
+        else
+            warn "  --swap-space not supported by this vLLM version, ignoring"
+        fi
     fi
 
     local exec_str=""
@@ -430,7 +445,7 @@ start_vllm() {
             --block-size $block_size \
             --dtype $dtype \
             --trust-remote-code \
-            $quant_str $swap_str $exec_str $eager_str 2>&1 | tee /tmp/bench_vllm.log; sleep infinity"
+            $quant_str $swap_str $exec_str $eager_str 2>&1 | tee /tmp/bench_vllm.log"
 
     log "  Waiting for vLLM to be ready..."
     if wait_for_server "vLLM" "http://localhost:$port/v1/models" 300 "vllm serve"; then
@@ -522,7 +537,7 @@ start_llamacpp() {
             $cp_flag \
             $ts_flag \
             --metrics \
-            2>&1 | tee /tmp/bench_llama.log; sleep infinity"
+            2>&1 | tee /tmp/bench_llama.log"
 
     log "  Waiting for llama.cpp to be ready..."
     if wait_for_server "llama.cpp" "http://localhost:$port/health" 300 "llama-server"; then

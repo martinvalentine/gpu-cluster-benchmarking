@@ -32,6 +32,18 @@ rm -rf /var/lib/apt/lists/*
 
 log_info "System packages installed."
 
+# ── 1b. Zellij ──────────────────────────────────────────────────────
+if command -v zellij &>/dev/null; then
+    log_info "zellij already installed: $(zellij --version)"
+else
+    log_info "Installing zellij..."
+    ZELLIJ_ARCH="x86_64-unknown-linux-musl"
+    curl -sL "https://github.com/zellij-org/zellij/releases/latest/download/zellij-${ZELLIJ_ARCH}.tar.gz" \
+        | tar -xz -C /usr/local/bin
+    chmod +x /usr/local/bin/zellij
+    log_info "zellij installed: $(zellij --version)"
+fi
+
 # ── 2. uv ──────────────────────────────────────────────────────────
 if command -v uv &>/dev/null; then
     log_info "uv already installed: $(uv --version)"
@@ -104,6 +116,7 @@ log_info "Installed tools:"
 command -v uv         &>/dev/null && log_info "  uv:         $(uv --version)"
 command -v vim        &>/dev/null && log_info "  vim:        $(vim --version | head -1)"
 command -v git        &>/dev/null && log_info "  git:        $(git --version)"
+command -v zellij     &>/dev/null && log_info "  zellij:     $(zellij --version)"
 command -v tmux       &>/dev/null && log_info "  tmux:       $(tmux -V)"
 command -v redis-cli  &>/dev/null && log_info "  redis-cli:  $(redis-cli --version)"
 command -v nvidia-smi &>/dev/null && log_info "  nvidia-smi: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)"
