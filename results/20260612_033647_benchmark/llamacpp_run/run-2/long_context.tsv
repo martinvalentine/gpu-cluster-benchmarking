@@ -1,4 +1,0 @@
-ctx_tokens	prefill_ms	prefill_tps	decode_tps
-1024	timeout	?	?
-4096	timeout	?	?
-16384	timeout	?	?

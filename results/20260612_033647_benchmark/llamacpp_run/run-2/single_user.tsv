@@ -1,5 +1,0 @@
-label	prompt_tokens	completion_tokens	ttft_ms	decode_tps	total_s
-short	34	10	433	23.1	0.43
-medium	38	128	1548	82.7	1.55
-code	44	212	2168	97.8	2.17
-long	47	209	2135	97.9	2.13
