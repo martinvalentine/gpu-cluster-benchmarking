@@ -64,7 +64,8 @@ gpu-cluster-benchmarking/
 │   ├── run.md                       # Start servers (all params)
 │   ├── download-models.md           # Download models
 │   ├── benchmark.md                 # Run benchmarks (all params)
-│   └── config.md                    # Config files reference
+│   ├── config.md                    # Config files reference
+│   └── params.md                    # Full parameter reference for models.yaml
 ├── pyproject.toml                   # uv dependency groups
 ├── litellm_config.yaml              # LiteLLM proxy config (auto-generated)
 ├── Dockerfile.serving               # Docker image (vLLM + llama-cpp-turboquant)
@@ -189,6 +190,7 @@ uv run python scripts/download-models.py --dry-run
 | [docs/download-models.md](docs/download-models.md) | Download models from HuggingFace |
 | [docs/benchmark.md](docs/benchmark.md) | Run benchmarks — params, pipeline, results |
 | [docs/config.md](docs/config.md) | Config files, env vars, options reference |
+| [docs/params.md](docs/params.md) | Full parameter reference for `configs/models.yaml` |
 
 ## Scripts Reference
 
