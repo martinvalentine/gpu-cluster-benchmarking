@@ -26,6 +26,8 @@
 #   Adjust `cluster` section to match your pod's GPU count and memory.
 #   Per-model vllm_tp/vllm_gpu_mem override cluster defaults.
 #   Models requiring more GPUs than cluster.gpu_count are auto-skipped.
+#
+# For 6-GPU config, see: configs/models.yaml.backup-6gpu
 # ============================================================
 
 # ── Cluster Configuration (1× NVIDIA A40) ─────────────────────
@@ -33,7 +35,7 @@
 cluster:
   gpu_count: 1              # Single GPU
 
-  # vLLM 0.22.1 optimized for A40 (CUDA graphs, PagedAttention)
+  # vLLM optimized for A40 (CUDA graphs, PagedAttention)
   # Reference: https://docs.vllm.ai/en/latest/serving/engine_args.html
   vllm:
     tp: 1                   # Single GPU, no tensor parallelism
@@ -44,7 +46,7 @@ cluster:
     quant: none             # Per-model override (awq for 32B)
     block_size: 16          # PagedAttention block size (16 = best throughput)
     dtype: auto             # auto → bfloat16 on A40 (best perf)
-    swap_space: 4           # 4GB CPU swap (use RAM as overflow buffer)
+    swap_space: 32          # 32GB CPU KV overflow — absorbs burst without dropping requests
     enforce_eager: false    # false = CUDA graphs (faster on A40)
 
   # llama.cpp turboquant optimized for A40 (CUDA, Flash Attention, TurboQuant KV)
@@ -53,6 +55,7 @@ cluster:
     n_parallel: 4           # 4 concurrent slots (single GPU, conservative)
     ctx_size: 8192          # 8K context per slot (32K total KV pool)
     n_gpu_layers: all       # Offload ALL layers to GPU (A40 = 64 layers)
+    tensor_split: ""        # Empty = single GPU (llama.cpp default)
     batch: 2048             # Prefill batch size (reduced for single GPU)
     ubatch: 512             # Micro-batch size (conservative for single GPU)
     threads: 16             # CPU threads (conservative for single GPU setup)
@@ -66,7 +69,7 @@ dataset:
   sharegpt: /workspace/datasets/sharegpt.json
 
 # Base directory for all models
-base_dir: /workspace/models
+base_dir: models
 
 # Default backend ports (used by gen-litellm-config.py)
 ports:
@@ -185,7 +188,7 @@ models:
     backend: llamacpp
     proxy_name: qwen14b-llamacpp
     endpoint: true
-    llamacpp_n_parallel: 2      # 2 slots (14B is heavy for single GPU)
+    llamacpp_n_parallel: 4      # 4 slots — 14B Q4 ~8GB + turbo4 KV, safe on 48GB
     llamacpp_ctx_size: 8192     # 8K context
 
   # ── Phase P3: Heavy (32B AWQ) ──────────────────────────────
@@ -205,6 +208,7 @@ models:
     vllm_gpu_mem: "0.92"    # 92% VRAM (~44GB usable)
     vllm_quant: awq         # AWQ Int4 quantization
     vllm_max_seqs: 32       # Reduced concurrency for single GPU
+    vllm_max_batched_tokens: 8192  # Match max_seqs: 32 seqs × 256 tokens avg per prefill step
 
   - name: qwen32b-gguf
     repo_id: Qwen/Qwen2.5-32B-Instruct-GGUF
