@@ -1,0 +1,3 @@
+conc	completed	total_tokens	wall_ms	agg_tps	per_user_tps	avg_latency_ms	status
+100	100	20838	23088	902.5	9.1	22802	pass
+200	200	41849	40425	1035.2	6.9	30195	pass

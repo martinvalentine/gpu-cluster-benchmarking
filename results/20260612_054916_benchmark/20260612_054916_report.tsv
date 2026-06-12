@@ -1,0 +1,45 @@
+Phase	Model	Conc.	vllm TTFT ms	vllm tok/s	llamacpp TTFT ms	llamacpp tok/s	sglang TTFT ms	sglang tok/s	Notes
+P1 Light	Qwen2.5-0.6B	1	30.1	106.4					Baseline
+P1 Light	Qwen2.5-0.6B	32	92.5	1948.8					
+P1 Light	Qwen2.5-0.6B	64	129.3	2738.3					
+P1 Light	Qwen2.5-0.6B	128	202.1	3485.2					
+P1 Light	Qwen2.5-7B	1	90.0	15.8					Baseline
+P1 Light	Qwen2.5-7B	32	287.5	349.8					
+P1 Light	Qwen2.5-7B	64	339.5	582.6					
+P1 Light	Qwen2.5-7B	128	486.7	834.6					
+P2 Medium	Qwen2.5-0.6B	1	28.2	105.1					Baseline
+P2 Medium	Qwen2.5-0.6B	16	55.8	1061.0					
+P2 Medium	Qwen2.5-0.6B	32	82.1	2053.3					
+P2 Medium	Qwen2.5-0.6B	64	125.6	2836.6					
+P2 Medium	Qwen2.5-7B	1	114.6	15.8					Baseline
+P2 Medium	Qwen2.5-7B	16	310.8	175.1					
+P2 Medium	Qwen2.5-7B	32	262.6	363.2					
+P2 Medium	Qwen2.5-7B	64	343.5	583.9					
+P3 Heavy	Qwen2.5-0.6B	1	29.9	106.5					Baseline
+P3 Heavy	Qwen2.5-0.6B	4	44.4	323.1					
+P3 Heavy	Qwen2.5-0.6B	8	50.4	597.6					
+P3 Heavy	Qwen2.5-0.6B	16	56.5	1071.7					
+P3 Heavy	Qwen2.5-7B	1	90.3	15.8					Baseline
+P3 Heavy	Qwen2.5-7B	4	194.3	52.0					
+P3 Heavy	Qwen2.5-7B	8	202.3	99.3					
+P3 Heavy	Qwen2.5-7B	16	232.0	177.6					
+unknown	Qwen2.5-0.6B	1	49.8	104.9					Baseline
+unknown	Qwen2.5-0.6B	4	52.0	318.2					
+unknown	Qwen2.5-0.6B Q4_K_M	1				6.0			Baseline
+unknown	Qwen2.5-0.6B Q4_K_M	4			24743.0	33.8			
+unknown	Qwen2.5-0.6B Q4_K_M	8			22576.0	73.8			
+unknown	Qwen2.5-0.6B Q4_K_M	16			25011.0	133.4			
+unknown	Qwen2.5-14B Q4_K_M	1				13.3			Baseline
+unknown	Qwen2.5-14B Q4_K_M	4			31667.0	41.1			
+unknown	Qwen2.5-14B Q4_K_M	8			42314.0	61.0			
+unknown	Qwen2.5-14B Q4_K_M	16			46485.0	104.0			
+unknown	Qwen2.5-32B Q4_K_M	1				4.4			Baseline
+unknown	Qwen2.5-32B Q4_K_M	4			79626.0	14.7			
+unknown	Qwen2.5-32B Q4_K_M	8			120264.0	20.9			
+unknown	Qwen2.5-32B Q4_K_M	16			141380.0	17.8			
+unknown	Qwen2.5-7B	1	128.2	15.8					Baseline
+unknown	Qwen2.5-7B	4	240.4	53.2					
+unknown	Qwen2.5-7B Q4_K_M	1				18.1			Baseline
+unknown	Qwen2.5-7B Q4_K_M	4			13842.0	60.1			
+unknown	Qwen2.5-7B Q4_K_M	8			15968.0	104.5			
+unknown	Qwen2.5-7B Q4_K_M	16			15740.0	211.9			

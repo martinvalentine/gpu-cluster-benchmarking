@@ -1,0 +1,4 @@
+ctx_tokens	prefill_ms	prefill_tps	decode_tps
+973	10077	97	3.4
+4096	timeout	?	?
+16384	timeout	?	?
