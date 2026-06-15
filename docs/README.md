@@ -7,4 +7,5 @@
 | [run.md](run.md) | Start servers — all params for vLLM, llama.cpp, SGLang, embedding, proxy |
 | [download-models.md](download-models.md) | Download models from HuggingFace |
 | [benchmark.md](benchmark.md) | Run benchmarks — phases, params, pipeline, results |
-| [config.md](config.md) | All config files, env vars, and options reference |
+| [config.md](config.md) | Config files, env vars, and options reference |
+| [params.md](params.md) | Full parameter reference for `configs/models.yaml` |
