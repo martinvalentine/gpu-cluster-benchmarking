@@ -1,74 +1,54 @@
 # ============================================================
 # Model Download & Endpoint Configuration
 # ============================================================
-# Single source of truth for:
-#   1. Which models to download (download-models.py)
-#   2. Which endpoints to route through LiteLLM proxy (gen-litellm-config.py)
-#   3. Which servers to start (start-all-tmux.sh)
-#   4. Per-model benchmark settings (bench-models.sh)
-#
-# TARGET: 1× NVIDIA A40 48GB (48GB VRAM) + 300GB RAM
-#
+# Optimized for: 5× NVIDIA A40 48GB + 300GB RAM
+# Target: Stable 1000-2000 CCU, prompt length 500-16000 tokens
+# Priority: Stability > Throughput (headroom KV cache, chunked prefill)
+
 # Usage:
-#   uv run python scripts/download-models.py                         # Download all enabled
-#   uv run python scripts/download-models.py --only qwen32b-awq     # Download specific
-#   uv run python scripts/download-models.py --phase p0 p1           # Download by phase
-#   uv run python scripts/download-models.py --dry-run               # Preview
-#   uv run python scripts/gen-litellm-config.py                      # Regenerate proxy config
-#
-# Models organized by benchmark phase (from benchmark_plan.md):
-#   P0 Ultra-Light:  0.6B  (~0.2 GB VRAM)
-#   P1 Light:        7B    (~3 GB VRAM)
-#   P2 Medium:       14B   (~5 GB VRAM)
-#   P3 Heavy:        32B   (~20 GB VRAM with AWQ)
-#
-# Cluster config:
-#   Adjust `cluster` section to match your pod's GPU count and memory.
-#   Per-model vllm_tp/vllm_gpu_mem override cluster defaults.
-#   Models requiring more GPUs than cluster.gpu_count are auto-skipped.
+# uv run python scripts/download-models.py
+# uv run python scripts/gen-litellm-config.py
+# uv run python scripts/bench-models.sh --phase p0 p1 --concurrent 1200 ...
+
 # ============================================================
-
-# ── Cluster Configuration (1× NVIDIA A40) ─────────────────────
-# gpu_count: auto-detected from nvidia-smi if set to 0 or omitted.
+# ── Cluster Configuration (5× NVIDIA A40) ─────────────────────
 cluster:
-  gpu_count: 1              # Single GPU
-
-  # vLLM 0.22.1 optimized for A40 (CUDA graphs, PagedAttention)
-  # Reference: https://docs.vllm.ai/en/latest/serving/engine_args.html
+  gpu_count: 5
   vllm:
-    tp: 1                   # Single GPU, no tensor parallelism
-    gpu_mem_util: "0.92"    # 92% VRAM (A40 48GB → ~44GB usable, ~4GB buffer)
-    max_model_len: 4096     # Context window per request
-    max_num_seqs: 64        # Moderate concurrency for single GPU
-    max_batched_tokens: 4096   # Reduced for single GPU throughput
-    quant: none             # Per-model override (awq for 32B)
-    block_size: 16          # PagedAttention block size (16 = best throughput)
-    dtype: auto             # auto → bfloat16 on A40 (best perf)
-    swap_space: 4           # 4GB CPU swap (use RAM as overflow buffer)
-    enforce_eager: false    # false = CUDA graphs (faster on A40)
+    tp: 5
+    gpu_mem_util: "0.85"          # Headroom cho KV cache lớn (16k context)
+    max_model_len: 16384
+    max_num_seqs: 1024
+    max_batched_tokens: 65536
+    block_size: 16
+    dtype: auto
+    swap_space: 64                # Tránh OOM khi burst cao
+    enforce_eager: false
+    distributed_executor: mp
+    enable_chunked_prefill: true
+    enable_prefix_caching: true
 
-  # llama.cpp turboquant optimized for A40 (CUDA, Flash Attention, TurboQuant KV)
-  # Reference: third_party/llama-cpp-turboquant/README.md
   llamacpp:
-    n_parallel: 4           # 4 concurrent slots (single GPU, conservative)
-    ctx_size: 8192          # 8K context per slot (32K total KV pool)
-    n_gpu_layers: all       # Offload ALL layers to GPU (A40 = 64 layers)
-    batch: 2048             # Prefill batch size (reduced for single GPU)
-    ubatch: 512             # Micro-batch size (conservative for single GPU)
-    threads: 16             # CPU threads (conservative for single GPU setup)
-    cache_key: q8_0         # 8-bit key cache (standard)
-    cache_val: turbo4       # TurboQuant 4-bit value cache (~50% VRAM savings)
-    flash_attn: on          # Flash Attention (required for TurboQuant)
-    cache_prompt: true      # Prompt caching (reuse KV for same prefix)
+    n_parallel: 48                # Conservative cho stability
+    ctx_size: 16384
+    n_gpu_layers: all
+    tensor_split: "1,1,1,1,1"    # 5 GPUs
+    batch: 8192
+    ubatch: 2048
+    threads: 48
+    cache_key: q8_0
+    cache_val: turbo4
+    flash_attn: on
+    cache_prompt: true
 
-# Benchmark dataset path
+# Benchmark dataset
 dataset:
   sharegpt: /workspace/datasets/sharegpt.json
 
-# Base directory for all models
+# Base directory
 base_dir: /workspace/models
 
-# Default backend ports (used by gen-litellm-config.py)
+# Default ports
 ports:
   vllm: 8000
   llamacpp: 8001
@@ -77,7 +57,7 @@ ports:
   proxy: 4000
 
 models:
-  # ── Embedding Model (for LiteLLM semantic cache) ────────────
+  # ── Embedding Model ───────────────────────────────────────
   - name: qwen3-embedding
     repo_id: Qwen/Qwen3-Embedding-0.6B-GGUF
     local_dir: gguf/qwen3-embedding-0.6b
@@ -88,10 +68,9 @@ models:
     backend: llamacpp
     proxy_name: embedding-model
     endpoint: true
-    api_port: 8003           # Embedding server port (overrides backend default)
+    api_port: 8003
 
   # ── Phase P0: Ultra-Light (0.5B) ───────────────────────────
-  # Small model → TP=1, minimal GPU usage, high concurrency
   - name: qwen0.5b
     repo_id: Qwen/Qwen2.5-0.5B-Instruct
     local_dir: hf/qwen2.5-0.6b
@@ -101,9 +80,10 @@ models:
     backend: vllm
     proxy_name: qwen0.5b-vllm
     endpoint: true
-    vllm_tp: 1              # 1 GPU is enough for 0.5B
-    vllm_gpu_mem: "0.15"    # ~7GB reserved (minimal)
-    vllm_max_seqs: 128      # Moderate concurrency for single GPU
+    vllm_tp: 1
+    vllm_gpu_mem: "0.75"
+    vllm_max_seqs: 1536
+    vllm_max_batched_tokens: 65536
 
   - name: qwen0.5b-gguf
     repo_id: Qwen/Qwen2.5-0.5B-Instruct-GGUF
@@ -115,25 +95,18 @@ models:
     backend: llamacpp
     proxy_name: qwen0.5b-llamacpp
     endpoint: true
-    llamacpp_n_parallel: 8      # 8 slots for tiny model (single GPU)
-    llamacpp_ctx_size: 4096     # 4K context
+    llamacpp_n_parallel: 128
+    llamacpp_tensor_split: "1,1,1,1,1"
+    llamacpp_ctx_size: 16384
+    llamacpp_batch: 8192
+    llamacpp_ubatch: 2048
+    llamacpp_threads: 48
+    llamacpp_cache_key: q8_0
+    llamacpp_cache_val: turbo4
+    llamacpp_flash_attn: on
+    llamacpp_cache_prompt: true
 
   # ── Phase P1: Light (7B) ───────────────────────────────────
-  # Mid-size → TP=1, moderate GPU usage
-  - name: llama3.1-8b
-    repo_id: meta-llama/Llama-3.1-8B-Instruct
-    local_dir: hf/llama3.1-8b
-    format: hf
-    enabled: false
-    phase: p1
-    backend: vllm
-    proxy_name: llama3.1-8b-vllm
-    endpoint: true
-    vllm_tp: 1              # 1 GPU fits 8B BF16
-    vllm_gpu_mem: "0.85"    # ~40GB reserved
-    vllm_max_seqs: 64       # Moderate concurrency for single GPU
-    # NOTE: Requires Meta approval. Run: hf auth login
-
   - name: qwen7b
     repo_id: Qwen/Qwen2.5-7B-Instruct
     local_dir: hf/qwen2.5-7b
@@ -143,9 +116,11 @@ models:
     backend: vllm
     proxy_name: qwen7b-vllm
     endpoint: true
-    vllm_tp: 1              # 1 GPU fits 7B BF16
-    vllm_gpu_mem: "0.85"    # ~40GB reserved
-    vllm_max_seqs: 64       # Moderate concurrency for single GPU
+    vllm_tp: 1
+    vllm_gpu_mem: "0.82"
+    vllm_max_seqs: 768
+    vllm_max_batched_tokens: 65536
+    vllm_max_model_len: 16384
 
   - name: qwen7b-gguf
     repo_id: Qwen/Qwen2.5-7B-Instruct-GGUF
@@ -157,11 +132,18 @@ models:
     backend: llamacpp
     proxy_name: qwen7b-llamacpp
     endpoint: true
-    llamacpp_n_parallel: 4      # 4 slots (single GPU)
-    llamacpp_ctx_size: 8192     # 8K context
+    llamacpp_n_parallel: 64
+    llamacpp_tensor_split: "1,1,1,1,1"
+    llamacpp_ctx_size: 16384
+    llamacpp_batch: 8192
+    llamacpp_ubatch: 2048
+    llamacpp_threads: 48
+    llamacpp_cache_key: q8_0
+    llamacpp_cache_val: turbo4
+    llamacpp_flash_attn: on
+    llamacpp_cache_prompt: true
 
   # ── Phase P2: Medium (14B) ─────────────────────────────────
-  # Large → TP=1, fits on single A40 with reduced concurrency
   - name: qwen14b
     repo_id: Qwen/Qwen2.5-14B-Instruct
     local_dir: hf/qwen2.5-14b
@@ -171,9 +153,9 @@ models:
     backend: vllm
     proxy_name: qwen14b-vllm
     endpoint: true
-    vllm_tp: 1              # Single GPU (14B BF16 ~28GB fits in 48GB)
-    vllm_gpu_mem: "0.92"    # ~44GB usable (tight fit, needs full allocation)
-    vllm_max_seqs: 32       # Reduced concurrency for single GPU
+    vllm_tp: 2
+    vllm_gpu_mem: "0.85"
+    vllm_max_seqs: 256
 
   - name: qwen14b-gguf
     repo_id: Qwen/Qwen2.5-14B-Instruct-GGUF
@@ -185,26 +167,34 @@ models:
     backend: llamacpp
     proxy_name: qwen14b-llamacpp
     endpoint: true
-    llamacpp_n_parallel: 2      # 2 slots (14B is heavy for single GPU)
-    llamacpp_ctx_size: 8192     # 8K context
+    llamacpp_n_parallel: 32
+    llamacpp_tensor_split: "1,1,1,1,1"
+    llamacpp_ctx_size: 16384
+    llamacpp_batch: 8192
+    llamacpp_ubatch: 2048
+    llamacpp_threads: 48
+    llamacpp_cache_key: q8_0
+    llamacpp_cache_val: turbo4
+    llamacpp_flash_attn: on
+    llamacpp_cache_prompt: true
 
-  # ── Phase P3: Heavy (32B AWQ) ──────────────────────────────
-  # Largest → TP=1, AWQ quantization, single GPU (tight fit)
-  - name: qwen32b-awq
-    repo_id: Qwen/Qwen2.5-32B-Instruct-AWQ
-    local_dir: hf/qwen2.5-32b-awq
+  # ── Phase P3: Heavy (32B) ──────────────────────────────────
+  - name: qwen32b
+    repo_id: Qwen/Qwen2.5-32B-Instruct
+    local_dir: hf/qwen2.5-32b
     format: hf
     enabled: true
     phase: p3
     backend: vllm
     proxy_name: qwen32b-vllm
     endpoint: true
-    # 32B AWQ int4 ≈ 20GB → single GPU → ~20GB for weights
-    # Remaining ~24GB for KV cache → limited batch capacity
-    vllm_tp: 1              # Single GPU (AWQ 4-bit fits in 48GB)
-    vllm_gpu_mem: "0.92"    # 92% VRAM (~44GB usable)
-    vllm_quant: awq         # AWQ Int4 quantization
-    vllm_max_seqs: 32       # Reduced concurrency for single GPU
+    vllm_tp: 5                     # Full 5 GPUs
+    vllm_gpu_mem: "0.82"           # Headroom KV cache
+    vllm_max_seqs: 192             # Conservative cho 32B + 16k
+    vllm_max_batched_tokens: 32768
+    vllm_max_model_len: 16384
+    vllm_enable_chunked_prefill: true
+    vllm_enable_prefix_caching: true
 
   - name: qwen32b-gguf
     repo_id: Qwen/Qwen2.5-32B-Instruct-GGUF
@@ -216,12 +206,13 @@ models:
     backend: llamacpp
     proxy_name: qwen32b-llamacpp
     endpoint: true
-    llamacpp_n_parallel: 2      # 2 parallel slots (32B is heavy for single GPU)
-    llamacpp_ctx_size: 8192     # 8K context per slot
-    llamacpp_batch: 2048        # Reduced prefill batch for single GPU
-    llamacpp_ubatch: 512        # Reduced micro-batch for single GPU
-    llamacpp_threads: 16        # Conservative CPU threads for single GPU setup
-    llamacpp_cache_key: q8_0    # 8-bit key cache
-    llamacpp_cache_val: turbo4  # TurboQuant 4-bit value cache
-    llamacpp_flash_attn: on     # Flash Attention (required for TurboQuant)
-    llamacpp_cache_prompt: true # Prompt caching for prefix reuse
+    llamacpp_n_parallel: 12        # Thấp để ổn định
+    llamacpp_tensor_split: "1,1,1,1,1"
+    llamacpp_ctx_size: 16384
+    llamacpp_batch: 8192
+    llamacpp_ubatch: 2048
+    llamacpp_threads: 48
+    llamacpp_cache_key: q8_0
+    llamacpp_cache_val: turbo4
+    llamacpp_flash_attn: on
+    llamacpp_cache_prompt: true
