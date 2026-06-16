@@ -68,7 +68,6 @@ gpu-cluster-benchmarking/
 │   └── params.md                    # Full parameter reference for models.yaml
 ├── pyproject.toml                   # uv dependency groups
 ├── litellm_config.yaml              # LiteLLM proxy config (auto-generated)
-├── Dockerfile.serving               # Docker image (vLLM + llama-cpp-turboquant)
 ├── docker/
 │   └── Dockerfile.vllm-sglang-llama   # Harmony image (vLLM + SGLang + llama-cpp-turboquant)
 └── benchmark_plan.md                # Benchmark strategy
