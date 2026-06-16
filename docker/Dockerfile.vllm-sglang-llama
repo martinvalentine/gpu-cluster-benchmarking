@@ -1,0 +1,95 @@
+# ============================================================
+# Harmony Benchmark Image — vLLM + SGLang + llama-cpp-turboquant
+# ============================================================
+#
+# Multi-stage build using official vLLM image as base.
+# llama-cpp-turboquant built from submodule in Stage 1.
+# SGLang + flashinfer installed via PyPI in Stage 2.
+#
+# Build:
+#   docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+#
+# Build (override CUDA arch):
+#   docker build --build-arg CUDA_ARCH="8.0 8.6 8.9 9.0" -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+#
+# Run:
+#   docker run --gpus all --ipc=host -it harmony-bench:cu129
+#
+# Usage (via docker exec):
+#   docker exec -it <container> vllm serve <model>
+#   docker exec -it <container> python3 -m sglang.launch_server --model <model>
+#   docker exec -it <container> llama-server -m <model.gguf>
+# ============================================================
+
+ARG VLLM_VERSION=v0.20.1
+ARG CUDA_VERSION=129
+ARG UBUNTU_VERSION=2404
+
+# ── STAGE 1: Build llama-cpp-turboquant from submodule ───
+FROM nvidia/cuda:12.9.0-devel-ubuntu24.04 AS turboquant-build
+
+ARG CUDA_ARCH=8.6
+ARG CMAKE_JOBS=8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake build-essential git \
+    && rm -rf /var/lib/apt/lists/*
+
+# CUDA stubs for linking without host driver (libcuda.so lives in driver, not toolkit)
+ENV LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_PATH}
+RUN ln -sf /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so \
+           /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so.1
+
+# Build directly from submodule — no prebuilt dir needed
+COPY third_party/llama-cpp-turboquant /src
+
+# Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
+# BUILD_SHARED_LIBS left at default (ON) — matches existing Dockerfiles
+# LLAMA_BUILD_EXAMPLES/TESTS=OFF — only need server + bench
+RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
+    && cmake -B /build -S /src \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
+        -DGGML_CUDA_GRAPHS=ON \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_TESTS=OFF \
+    && cmake --build /build --config Release -j"${CMAKE_JOBS}"
+
+# ── STAGE 2: Runtime ─────────────────────────────────────
+FROM vllm/vllm-openai:${VLLM_VERSION}-cu${CUDA_VERSION}-ubuntu${UBUNTU_VERSION} AS runtime
+
+# ── SGLang + flashinfer ───────────────────────────────────
+ARG SGLANG_VERSION=0.5.8
+ARG SGL_KERNEL_VERSION=0.3.21
+
+RUN pip install --no-cache-dir --timeout 1200 \
+    sglang==${SGLANG_VERSION} \
+    flashinfer-python==0.6.1 \
+    sgl-kernel==${SGL_KERNEL_VERSION} \
+    --find-links https://flashinfer.ai/whl/cu129/
+
+# ── llama binaries from build stage ──────────────────────
+COPY --from=turboquant-build --chmod=755 /build/bin/llama-server /usr/local/bin/
+COPY --from=turboquant-build --chmod=755 /build/bin/llama-bench  /usr/local/bin/
+COPY --from=turboquant-build --chmod=644 /build/bin/*.so*        /usr/local/lib/
+RUN ldconfig
+
+# ── SSH + Redis ───────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server redis-server curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd /root/.ssh \
+    && chmod 700 /root/.ssh
+
+# ── Entrypoint ────────────────────────────────────────────
+COPY scripts/docker/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+EXPOSE 22 6379 8000 8001 8003 30000
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/app/start.sh"]
+CMD ["sleep", "infinity"]
