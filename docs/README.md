@@ -9,3 +9,4 @@
 | [benchmark.md](benchmark.md) | Run benchmarks — phases, params, pipeline, results |
 | [config.md](config.md) | Config files, env vars, and options reference |
 | [params.md](params.md) | Full parameter reference for `configs/models.yaml` |
+| [docker.md](docker.md) | Docker images — Harmony image build, run, verify |
