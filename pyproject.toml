@@ -20,6 +20,7 @@ common = [
     "psutil",
     "gputil",
     "redis",
+    "requests"
 ]
 
 vllm = [
@@ -74,6 +75,4 @@ conflicts = [
 extra-build-dependencies = { vllm = ["setuptools", "setuptools_rust", "setuptools_scm", "torch", "ninja", "packaging"], sglang = ["setuptools", "torch"] }
 
 
-[tool.uv.sources]
-vllm = { path = "third_party/vllm", editable = true }
-sglang = { path = "third_party/sglang/python", editable = true }
+
