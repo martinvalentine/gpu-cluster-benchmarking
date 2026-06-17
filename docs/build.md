@@ -42,3 +42,39 @@ NPROC=4 ./scripts/build/build-llamacpp-turbo.sh
 ls -la third_party/llama-cpp-turboquant/build/bin/llama-server
 ./third_party/llama-cpp-turboquant/build/bin/llama-server --help
 ```
+
+---
+
+## Docker Build (Harmony Image)
+
+The Harmony image builds llama-cpp-turboquant inside Docker (no local build needed) and bundles vLLM + SGLang.
+
+```bash
+docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+```
+
+**Build parameters** (override via `--build-arg`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VLLM_VERSION` | `v0.20.1` | vLLM version (from Docker Hub) |
+| `CUDA_VERSION` | `129` | CUDA version |
+| `CUDA_ARCH` | `8.6` | GPU compute capability |
+| `CMAKE_JOBS` | `8` | Parallel compile jobs for llama.cpp |
+| `SGLANG_VERSION` | `0.5.8` | SGLang version |
+| `SGL_KERNEL_VERSION` | `0.3.21` | sgl-kernel version |
+
+**Examples:**
+
+```bash
+# Default (A40/RTX 3090)
+docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+
+# For RTX 4090
+docker build --build-arg CUDA_ARCH=8.9 -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+
+# For H100
+docker build --build-arg CUDA_ARCH=9.0 -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+```
+
+See [docker.md](docker.md) for full usage and verification.

@@ -68,7 +68,8 @@ gpu-cluster-benchmarking/
 │   └── params.md                    # Full parameter reference for models.yaml
 ├── pyproject.toml                   # uv dependency groups
 ├── litellm_config.yaml              # LiteLLM proxy config (auto-generated)
-├── Dockerfile.serving               # Docker image (vLLM + llama-cpp-turboquant)
+├── docker/
+│   └── Dockerfile.vllm-sglang-llama   # Harmony image (vLLM + SGLang + llama-cpp-turboquant)
 └── benchmark_plan.md                # Benchmark strategy
 ```
 
@@ -106,6 +107,30 @@ uv run python scripts/download-models.py
 ./scripts/bench-models.sh --dry-run        # Preview actions
 ```
 
+
+## Docker (Recommended for Benchmarking)
+
+The Harmony image bundles all three engines (vLLM + SGLang + llama-cpp-turboquant) in a single container.
+
+```bash
+# Build
+docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+
+# Run with GPU access and models mounted
+docker run --rm --gpus all --ipc=host \
+  -v $(pwd)/models:/workspace/models \
+  -it harmony-bench:cu129
+
+# Inside container — launch any engine:
+vllm serve /workspace/models/hf/<model> --port 8000
+python3 -m sglang.launch_server --model /workspace/models/hf/<model> --port 8003
+llama-server -m /workspace/models/gguf/<model>.gguf --port 8001
+
+# Run benchmarks
+./scripts/bench-models.sh
+```
+
+See [docs/docker.md](docs/docker.md) for full Docker documentation.
 ## Configuration
 
 Everything is configured in **`configs/models.yaml`** — this is the single source of truth.
@@ -191,6 +216,7 @@ uv run python scripts/download-models.py --dry-run
 | [docs/benchmark.md](docs/benchmark.md) | Run benchmarks — params, pipeline, results |
 | [docs/config.md](docs/config.md) | Config files, env vars, options reference |
 | [docs/params.md](docs/params.md) | Full parameter reference for `configs/models.yaml` |
+| [docs/docker.md](docs/docker.md) | Docker images — Harmony image build, run, verify |
 
 ## Scripts Reference
 

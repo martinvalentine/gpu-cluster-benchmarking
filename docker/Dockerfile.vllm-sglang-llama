@@ -1,0 +1,113 @@
+# ============================================================
+# Harmony Benchmark Image — vLLM + SGLang + llama-cpp-turboquant
+# ============================================================
+#
+# Multi-stage build using official vLLM image as base.
+# llama-cpp-turboquant built from submodule in Stage 1.
+# SGLang installed in a SEPARATE venv to avoid conflicts.
+#
+# Architecture:
+#   vLLM:       system Python (from base image, /usr/local/lib/python3.12/dist-packages/)
+#   SGLang:     /opt/venv-sglang/ (isolated venv)
+#   llama.cpp:  /usr/local/bin/ (native binaries)
+#
+# vLLM and SGLang are INCOMPATIBLE in the same Python environment
+# due to flashinfer and PyTorch ABI conflicts. They must never
+# share a process. Each is launched as its own server subprocess.
+#
+# Build:
+#   docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+#
+# Run:
+#   docker run --gpus all --ipc=host -it harmony-bench:cu129
+#
+# Usage (via docker exec):
+#   docker exec -it <container> vllm serve <model> --port 8000
+#   docker exec -it <container> /opt/venv-sglang/bin/python -m sglang.launch_server --model <model> --port 8003
+#   docker exec -it <container> llama-server -m <model.gguf> --port 8001
+# ============================================================
+
+ARG VLLM_VERSION=v0.23.0
+ARG CUDA_VERSION=129
+ARG UBUNTU_VERSION=2404
+
+# ── STAGE 1: Build llama-cpp-turboquant from submodule ───
+FROM nvidia/cuda:12.9.0-devel-ubuntu24.04 AS turboquant-build
+
+ARG CUDA_ARCH=8.6
+ARG CMAKE_JOBS=8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake build-essential git \
+    && rm -rf /var/lib/apt/lists/*
+
+# CUDA stubs for linking without host driver (libcuda.so lives in driver, not toolkit)
+ENV LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_PATH}
+RUN ln -sf /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so \
+           /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so.1
+
+# Build directly from submodule — no prebuilt dir needed
+COPY third_party/llama-cpp-turboquant /src
+
+# Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
+# BUILD_SHARED_LIBS left at default (ON) — matches existing Dockerfiles
+# LLAMA_BUILD_EXAMPLES/TESTS=OFF — only need server + bench
+RUN CUDA_ARCH_CMAKE="$(echo "${CUDA_ARCH}" | sed 's/\.//g; s/ /;/g')" \
+    && cmake -B /build -S /src \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH_CMAKE}" \
+        -DGGML_CUDA_GRAPHS=ON \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_TESTS=OFF \
+    && cmake --build /build --config Release -j"${CMAKE_JOBS}"
+
+# ── STAGE 2: Runtime ─────────────────────────────────────
+FROM vllm/vllm-openai:${VLLM_VERSION}-cu${CUDA_VERSION}-ubuntu${UBUNTU_VERSION} AS runtime
+
+# ── SGLang (isolated venv — INCOMPATIBLE with vLLM) ──────
+# vLLM and SGLang cannot share a Python environment due to
+# flashinfer and PyTorch ABI conflicts. SGLang gets its own venv.
+ARG SGLANG_VERSION=0.5.8
+
+# SGLang isolated venv — inherits system CUDA/nvidia packages
+# but gets its own torch + flashinfer to avoid ABI conflicts with vLLM
+RUN python3 -m venv /opt/venv-sglang --system-site-packages \
+    && /opt/venv-sglang/bin/pip install --no-cache-dir --upgrade pip wheel \
+    && /opt/venv-sglang/bin/pip install --no-cache-dir --timeout 1200 \
+    sglang==${SGLANG_VERSION} \
+    --find-links https://flashinfer.ai/whl/cu129/ \
+    && /opt/venv-sglang/bin/pip install --no-cache-dir --force-reinstall --timeout 300 \
+    flashinfer-python flashinfer-cubin \
+    --find-links https://flashinfer.ai/whl/cu129/
+# Force reinstall BOTH flashinfer packages to ensure SGLang's versions win over inherited system ones
+# Without this, pip may skip the install if it sees the system flashinfer as "already satisfied"
+
+# ── llama binaries from build stage ──────────────────────
+COPY --from=turboquant-build --chmod=755 /build/bin/llama-server /usr/local/bin/
+COPY --from=turboquant-build --chmod=755 /build/bin/llama-bench  /usr/local/bin/
+COPY --from=turboquant-build --chmod=644 /build/bin/*.so*        /usr/local/lib/
+RUN ldconfig
+
+# Verify both environments import cleanly at build time
+RUN python3 -c "import vllm; print('vLLM OK:', vllm.__version__)"
+RUN /opt/venv-sglang/bin/python3 -c "import sglang; print('SGLang OK:', sglang.__version__)"
+
+# ── SSH + Redis ───────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server redis-server curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd /root/.ssh \
+    && chmod 700 /root/.ssh
+
+# ── Entrypoint ────────────────────────────────────────────
+COPY scripts/docker/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+EXPOSE 22 6379 8000 8001 8003 30000
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/app/start.sh"]
+CMD ["sleep", "infinity"]
