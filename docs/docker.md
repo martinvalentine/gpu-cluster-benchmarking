@@ -8,7 +8,7 @@ A single Docker image bundling vLLM, SGLang, and llama-cpp-turboquant for unifie
 
 | Engine | Version | Source |
 |--------|---------|--------|
-| vLLM | 0.20.1 | Official vLLM image (inherited) |
+| vLLM | 0.23.0 | Official vLLM image (inherited) |
 | SGLang | 0.5.8 | PyPI |
 | flashinfer-python | 0.6.1 | PyPI (FlashInfer wheel index) |
 | sgl-kernel | 0.3.21 | PyPI |
@@ -51,7 +51,7 @@ Inside the container:
 vllm serve /workspace/models/hf/<model-name> --port 8000
 
 # SGLang (HuggingFace models, port 8003)
-python3 -m sglang.launch_server --model /workspace/models/hf/<model-name> --port 8003
+/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/<model-name> --port 8003
 
 # llama-server (GGUF models, port 8001)
 llama-server -m /workspace/models/gguf/<model-file>.gguf --port 8001
@@ -82,8 +82,8 @@ llama-bench -m /workspace/models/gguf/<model-file>.gguf -n 128
 
 ```bash
 # Check all engines
-docker run --rm harmony-bench:cu129 python3 -c "import sglang; print(f'sglang={sglang.__version__}')"
-docker run --rm harmony-bench:cu129 python3 -c "import flashinfer; print('flashinfer ok')"
+docker run --rm harmony-bench:cu129 /opt/venv-sglang/bin/python -c "import sglang; print(f'sglang={sglang.__version__}')"
+docker run --rm harmony-bench:cu129 /opt/venv-sglang/bin/python -c "import flashinfer; print('flashinfer ok')"
 docker run --rm harmony-bench:cu129 bash -c "command -v vllm"
 docker run --rm harmony-bench:cu129 bash -c "command -v llama-server"
 docker run --rm harmony-bench:cu129 bash -c "ldd /usr/local/bin/llama-server 2>&1 | grep -i 'not found' || echo 'ALL DEPS OK'"
@@ -112,6 +112,14 @@ timeout 10 docker run --rm harmony-bench:cu129 2>&1 || true
 
 Multi-stage Docker build:
 1. **Stage 1** (`turboquant-build`): Builds llama-cpp-turboquant from `third_party/llama-cpp-turboquant/` submodule using CUDA 12.9 devel image
-2. **Stage 2** (`runtime`): Uses official vLLM image as base, installs SGLang + flashinfer via PyPI, copies llama binaries from Stage 1
+2. **Stage 2** (`runtime`): Uses official vLLM image as base, installs SGLang in isolated venv, copies llama binaries from Stage 1
+
+**Separate Python environments:** vLLM and SGLang are incompatible in the same Python environment due to flashinfer and PyTorch ABI conflicts. vLLM uses the system Python (from base image), SGLang uses `/opt/venv-sglang/`. Each engine is launched as its own subprocess — they never share a process.
+
+| Engine | Python Environment | Launch Command |
+|--------|-------------------|----------------|
+| vLLM | System (`python3`) | `vllm serve <model> --port 8000` |
+| SGLang | `/opt/venv-sglang/` | `/opt/venv-sglang/bin/python -m sglang.launch_server --model <model> --port 8003` |
+| llama.cpp | N/A (native binary) | `llama-server -m <model.gguf> --port 8001` |
 
 Container behavior: Init-only toolbox — starts Redis/SSH, prints framework summary, sleeps forever. Users launch engines via `docker exec`.
