@@ -103,7 +103,13 @@ curl -s http://localhost:8000/v1/chat/completions \
 
 ## Running Multiple Engines Simultaneously
 
-Both engines share the same GPU. Use `--gpu-memory-utilization` (vLLM) and `--mem-fraction-static` (SGLang) to limit memory usage:
+All three engines share the same GPU. Use memory-limiting flags to keep each engine's VRAM footprint small:
+
+| Engine | Memory Control | Effect |
+|--------|---------------|--------|
+| vLLM | `--gpu-memory-utilization 0.1` | Caps GPU memory at 10% of total VRAM |
+| SGLang | `--mem-fraction-static 0.1` | Allocates 10% of total VRAM for static memory |
+| llama.cpp | `-np 1 -c 1024 -ctk q8_0 -ctv turbo4` | Minimal KV cache via small context + TurboQuant quantization |
 
 ```bash
 # Terminal 1: vLLM (10% GPU memory)
@@ -117,6 +123,12 @@ docker run --rm --gpus all --ipc=host -p 8003:8003 \
   -v $(pwd)/models:/workspace/models \
   harmony-bench:cu129 \
   bash -c "/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/qwen2.5-0.6b --port 8003 --host 0.0.0.0 --mem-fraction-static 0.1"
+
+# Terminal 3: llama.cpp (minimal KV cache, GGUF model required)
+docker run --rm --gpus all --ipc=host -p 8001:8001 \
+  -v $(pwd)/models:/workspace/models \
+  harmony-bench:cu129 \
+  bash -c "llama-server -m /workspace/models/gguf/qwen2.5-0.6b/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8001 --host 0.0.0.0 -np 1 -c 1024 -ctk q8_0 -ctv turbo4 -fa on"
 ```
 
 **Note:** Only run one inference engine at a time for benchmarking. Running multiple engines simultaneously is for testing connectivity only.
