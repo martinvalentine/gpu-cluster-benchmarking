@@ -1,8 +1,6 @@
 # Docker
 
-## Harmony Benchmark Image
-
-A single Docker image bundling vLLM, SGLang, and llama-cpp-turboquant for unified benchmarking.
+The `harmony-bench:cu129` image bundles vLLM, SGLang, and llama-cpp-turboquant for unified benchmarking. All commands in this doc use this tag — replace with your own registry path if you publish to a private registry.
 
 ### What's Included
 
@@ -24,7 +22,7 @@ Multi-stage Docker build:
 | Engine | Python Environment | Launch Command |
 |--------|-------------------|----------------|
 | vLLM | System (`python3`) | `vllm serve <model> --port 8000` |
-| SGLang | `/opt/venv-sglang/` | `/opt/venv-sglang/bin/python -m sglang.launch_server --model <model> --port 8003` |
+| SGLang | `/opt/venv-sglang/` | `/opt/venv-sglang/bin/python -m sglang.launch_server --model <model> --port 8002` |
 | llama.cpp | N/A (native binary) | `llama-server -m <model.gguf> --port 8001` |
 
 Container behavior: Init-only toolbox — starts Redis/SSH, prints framework summary, sleeps forever. Users launch engines via `docker exec`.
@@ -46,7 +44,7 @@ docker build --build-arg CUDA_ARCH=8.9 -f docker/Dockerfile.vllm-sglang-llama -t
 docker build --build-arg CUDA_ARCH=9.0 -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
 
 # Override versions
-docker build --build-arg SGLANG_VERSION=0.5.9 -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
+docker build --build-arg SGLANG_VERSION=0.5.8 -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
 ```
 
 ### 2. Run a Model
@@ -63,13 +61,13 @@ Inside the container, launch any engine:
 
 ```bash
 # vLLM (HuggingFace models, port 8000)
-vllm serve /workspace/models/hf/qwen2.5-0.6b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1
+vllm serve /workspace/models/hf/qwen2.5-0.5b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1
 
-# SGLang (HuggingFace models, port 8003)
-/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/qwen2.5-0.6b --port 8003 --host 0.0.0.0 --mem-fraction-static 0.1
+# SGLang (HuggingFace models, port 8002)
+/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/qwen2.5-0.5b --port 8002 --host 0.0.0.0 --mem-fraction-static 0.1
 
 # llama-server (GGUF models, port 8001)
-llama-server -m /workspace/models/gguf/qwen2.5-0.6b/ggml-model.gguf --port 8001 --host 0.0.0.0
+llama-server -m /workspace/models/gguf/qwen2.5-0.5b/ggml-model.gguf --port 8001 --host 0.0.0.0
 ```
 
 ### 3. Expose Ports to Host
@@ -81,7 +79,7 @@ To access the server from outside the container, add `-p` flag:
 docker run --rm --gpus all --ipc=host -p 8000:8000 \
   -v $(pwd)/models:/workspace/models \
   harmony-bench:cu129 \
-  bash -c "vllm serve /workspace/models/hf/qwen2.5-0.6b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1"
+  bash -c "vllm serve /workspace/models/hf/qwen2.5-0.5b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1"
 ```
 
 ### 4. Test the Server
@@ -96,7 +94,7 @@ curl -s http://localhost:8000/v1/models | python3 -m json.tool
 # Chat completion
 curl -s http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model": "/workspace/models/hf/qwen2.5-0.6b", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 20}' | python3 -m json.tool
+  -d '{"model": "/workspace/models/hf/qwen2.5-0.5b", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 20}' | python3 -m json.tool
 ```
 
 ---
@@ -116,22 +114,123 @@ All three engines share the same GPU. Use memory-limiting flags to keep each eng
 docker run --rm --gpus all --ipc=host -p 8000:8000 \
   -v $(pwd)/models:/workspace/models \
   harmony-bench:cu129 \
-  bash -c "vllm serve /workspace/models/hf/qwen2.5-0.6b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1"
+  bash -c "vllm serve /workspace/models/hf/qwen2.5-0.5b --port 8000 --host 0.0.0.0 --max-model-len 2048 --gpu-memory-utilization 0.1"
 
 # Terminal 2: SGLang (10% GPU memory)
-docker run --rm --gpus all --ipc=host -p 8003:8003 \
+docker run --rm --gpus all --ipc=host -p 8002:8002 \
   -v $(pwd)/models:/workspace/models \
   harmony-bench:cu129 \
-  bash -c "/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/qwen2.5-0.6b --port 8003 --host 0.0.0.0 --mem-fraction-static 0.1"
+  bash -c "/opt/venv-sglang/bin/python -m sglang.launch_server --model /workspace/models/hf/qwen2.5-0.5b --port 8002 --host 0.0.0.0 --mem-fraction-static 0.1"
 
 # Terminal 3: llama.cpp (minimal KV cache, GGUF model required)
 docker run --rm --gpus all --ipc=host -p 8001:8001 \
   -v $(pwd)/models:/workspace/models \
   harmony-bench:cu129 \
-  bash -c "llama-server -m /workspace/models/gguf/qwen2.5-0.6b/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8001 --host 0.0.0.0 -np 1 -c 1024 -ctk q8_0 -ctv turbo4 -fa on"
+  bash -c "llama-server -m /workspace/models/gguf/qwen2.5-0.5b/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8001 --host 0.0.0.0 -np 1 -c 1024 -ctk q8_0 -ctv turbo4 -fa on"
 ```
 
 **Note:** Only run one inference engine at a time for benchmarking. Running multiple engines simultaneously is for testing connectivity only.
+
+---
+
+## Host vLLM Server for Benchmarking
+
+Complete workflow: start container → launch vLLM → benchmark from host → stop.
+
+### 1. Start Container
+
+Choose one mode:
+
+**Background mode** (container stays alive, `docker exec` for everything):
+```bash
+docker run -d --rm --gpus all --ipc=host --network host \
+  -v $(pwd)/models:/workspace/models \
+  -v $(pwd)/scripts:/workspace/scripts \
+  -v $(pwd)/results:/workspace/results \
+  --name harmony-bench \
+  harmony-bench:cu129 sleep infinity
+```
+
+**Foreground mode** (server output visible, needs second terminal for benchmarks):
+```bash
+docker run --rm --gpus all --ipc=host --network host \
+  -v $(pwd)/models:/workspace/models \
+  -v $(pwd)/scripts:/workspace/scripts \
+  -v $(pwd)/results:/workspace/results \
+  --name harmony-bench \
+  harmony-bench:cu129 \
+  bash -c "vllm serve <model_path> --port 8000 --host 0.0.0.0 \
+    --max-model-len 16384 --gpu-memory-utilization 0.90 \
+    --served-model-name <HF_model_id>"
+```
+
+### 2. Launch vLLM Server (Background Mode)
+
+```bash
+docker exec -d harmony-bench vllm serve <model_path> --port 8000 --host 0.0.0.0 \
+  --max-model-len 16384 --gpu-memory-utilization 0.90 \
+  --served-model-name <HF_model_id>
+```
+
+**Flags explained:**
+
+| Flag | Purpose | Recommended |
+|------|---------|-------------|
+| `--max-model-len` | Max context length (KV cache) | 4096–16384 |
+| `--gpu-memory-utilization` | % GPU memory for KV cache | 0.85–0.95 (higher for small models) |
+| `--served-model-name` | HF-style model name reported by /v1/models | Enables `-m`-free benchmarking |
+
+Without `--served-model-name`, the server reports the local path (e.g., `/workspace/models/hf/qwen2.5-0.5b`) and benchmarking requires `-m <HF_model_id>`. Setting it to the HF model ID removes that requirement.
+
+### 3. Wait for Server Ready
+
+```bash
+docker exec harmony-bench bash -c \
+  'while ! curl -sf http://localhost:8000/v1/models >/dev/null 2>&1; do sleep 2; done && echo "vLLM ready"'
+```
+
+### 4. Test Connectivity
+
+```bash
+curl -s http://localhost:8000/v1/models | python3 -m json.tool
+curl -s http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"<served_model_name>","messages":[{"role":"user","content":"Hello"}],"max_tokens":16}'
+```
+
+### 5. Run Benchmarks
+
+**Native llama-benchy sweeps (concurrency + prompt ladders):**
+```bash
+.venv/bin/python -c "import matplotlib" 2>/dev/null || uv add --group benchmark matplotlib numpy
+
+ulimit -n 65536  # Required for high CCU (default 1024 fd limit)
+
+./scripts/benchmark/vllm_bench.sh -u http://localhost:8000/v1
+```
+
+**Cross-sweep (CCU ladder at each prompt size to measure KV cache pressure):**
+```bash
+ulimit -n 65536
+
+./scripts/benchmark/vllm_bench.sh -u http://localhost:8000/v1 \
+  --cross-sweep --early-exit \
+  --ccu-mode add --ccu-start 1 --ccu-max 2001 --ccu-step 100 \
+  --prompt-start 2048 --prompt-max 16384
+```
+
+**Visualize cross-sweep results:**
+```bash
+.venv/bin/python scripts/visualize_cross_sweep.py results/vllm/<session_dir>/
+```
+
+Outputs: `cross_sweep_table.md`, `ccu_ladder_pp*.png`, `ccu_vs_prompt.png`
+
+### 6. Stop Container
+
+```bash
+docker stop harmony-bench   # --rm flag auto-deletes container
+```
 
 ---
 
@@ -177,13 +276,13 @@ For benchmarking an already-running server:
 
 ```bash
 # vLLM benchmark
-VLLM_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.6b ./scripts/benchmark/bench-vllm.sh -u http://localhost:8000
+./scripts/benchmark/vllm_bench.sh -u http://localhost:8000 -m /workspace/models/hf/qwen2.5-0.5b --full
 
 # SGLang benchmark
-SGLANG_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.6b SGLANG_PYTHON=/opt/venv-sglang/bin/python ./scripts/benchmark/bench-sglang.sh -u http://localhost:8003
+./scripts/benchmark/sglang_bench.sh -u http://localhost:8002 -m /workspace/models/hf/qwen2.5-0.5b --full
 
 # llama.cpp benchmark
-./scripts/benchmark/bench-llamacpp.sh -u http://localhost:8001/v1
+./scripts/benchmark/llamacpp_bench.sh -u http://localhost:8001/v1 -m /workspace/models/gguf/qwen2.5-0.5b/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
 ### Running Benchmarks Inside Docker
@@ -199,7 +298,41 @@ docker run --rm --network host --gpus all \
   -v $(pwd)/configs:/workspace/configs \
   -v $(pwd)/.env:/workspace/.env \
   harmony-bench:cu129 \
-  bash -c "cd /workspace && ./scripts/benchmark/bench-vllm.sh -u http://localhost:8000"
+  bash -c "cd /workspace && ./scripts/benchmark/vllm_bench.sh -u http://localhost:8000 -m /workspace/models/hf/qwen2.5-0.5b --full"
+```
+
+### Using `docker-bench.sh` (Host-Side Wrapper)
+
+`docker-bench.sh` runs benchmarks from the host by forwarding commands to a running container via `docker exec`:
+
+```bash
+# Start the container
+docker run -d --gpus all --ipc=host --network host \
+  -v $(pwd)/models:/workspace/models \
+  -v $(pwd)/scripts:/workspace/scripts \
+  -v $(pwd)/configs:/workspace/configs \
+  -v $(pwd)/results:/workspace/results \
+  -v $(pwd)/datasets:/workspace/datasets \
+  --name harmony-bench harmony-bench:cu129 sleep infinity
+
+# Run benchmarks from host
+./scripts/docker/docker-bench.sh -- -b llamacpp
+./scripts/docker/docker-bench.sh -- -b vllm --ccu-mode mul --ccu-max 256
+./scripts/docker/docker-bench.sh -- -b sglang --full
+./scripts/docker/docker-bench.sh --container my-bench -- -b llamacpp
+
+# Or run inside container directly
+docker exec -it harmony-bench ./scripts/benchmark/bench.sh -b llamacpp
+```
+
+### Using `bench.sh` (Unified Dispatcher)
+
+`bench.sh` dispatches to per-backend scripts (`llamacpp_bench.sh`, `vllm_bench.sh`, `sglang_bench.sh`):
+
+```bash
+./scripts/benchmark/bench.sh -b llamacpp
+./scripts/benchmark/bench.sh -b vllm --native
+./scripts/benchmark/bench.sh -b sglang --full
 ```
 
 ---
@@ -235,8 +368,8 @@ VLLM_BENCH_DATASET_PATH=datasets/sharegpt.json
 SGLANG_BENCH_DATASET_PATH=datasets/sharegpt.json
 
 # Model paths (must match actual model location in container)
-VLLM_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.6b
-SGLANG_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.6b
+VLLM_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.5b
+SGLANG_BENCH_MODEL=/workspace/models/hf/qwen2.5-0.5b
 
 # Server URLs
 VLLM_BENCH_URL=http://localhost:8000
