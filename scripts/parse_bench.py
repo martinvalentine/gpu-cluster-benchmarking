@@ -142,7 +142,7 @@ def _load_params_from_dir(dir_path) -> "dict | None":
 def parse_vllm_json(data: dict, params: dict | None = None) -> dict:
     result = {
         "successful_requests": data.get("completed", data.get("successful_requests", 0)),
-        "failed_requests": data.get("failed_requests", 0),
+        "failed_requests": data.get("failed", data.get("failed_requests", 0)),
         "duration_s": round(data.get("duration", 0), 2),
         "req_throughput": round(data.get("request_throughput", 0), 3),
         "output_tok_s": round(data.get("output_throughput", 0), 2),
@@ -156,7 +156,7 @@ def parse_vllm_json(data: dict, params: dict | None = None) -> dict:
         "mean_itl_ms": round(data.get("mean_itl_ms", 0), 2),
         "p99_itl_ms": round(data.get("p99_itl_ms", 0), 2),
         "total_input_tokens": data.get("total_input_tokens", 0),
-        "total_generated_tokens": data.get("total_generated_tokens", 0),
+        "total_generated_tokens": data.get("total_output_tokens", data.get("total_generated_tokens", 0)),
     }
     result.update(_flatten_params(params))
     return result
@@ -323,7 +323,7 @@ def collect_results(results_dir: Path) -> list[dict]:
 
     # ── JSON files (vLLM + llama-benchy) ──────────────────────
     for json_file in sorted(results_dir.rglob("*.json")):
-        if any(x in json_file.name for x in ("benchmark_summary", "benchmark_report")):
+        if any(x in json_file.name for x in ("benchmark_summary", "benchmark_report", "params.json")):
             continue
         try:
             data = json.loads(json_file.read_text())
@@ -341,6 +341,9 @@ def collect_results(results_dir: Path) -> list[dict]:
         phase = detect_phase(json_file)
         run_name = detect_run_dir(json_file)
         model = model_map.get(run_name, run_name)
+        # For vllm native bench JSON, use the model_id field directly
+        if model == run_name and data.get("model_id"):
+            model = data.get("model_id", model)
         conc = extract_concurrency(json_file.name)
 
         metrics = parse_vllm_json(data, params=data.get("params"))
