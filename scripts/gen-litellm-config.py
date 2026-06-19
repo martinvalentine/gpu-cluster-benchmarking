@@ -17,48 +17,97 @@ from pathlib import Path
 import yaml
 
 
+class UnresolvableFilename(Exception):
+    """GGUF file not found in any search dir."""
+
+    def __init__(self, model_name, local_dir, include_pattern, search_dirs_checked):
+        self.model_name = model_name
+        self.local_dir = local_dir
+        self.include_pattern = include_pattern
+        self.search_dirs_checked = search_dirs_checked
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        lines = [
+            f"Could not resolve GGUF filename for '{self.model_name}'",
+            "Searched:",
+        ]
+        for d in self.search_dirs_checked:
+            lines.append(f"  {d}/{self.local_dir}/")
+        lines += [
+            f"Include pattern from config: {self.include_pattern!r}",
+            "Remediation:",
+            "  - Run inside the Docker container (base_dir=/workspace/models is set)",
+            "  - Or pass --base-dir to point at your local model location",
+            "  - Or set $LITELLM_BASE_DIR to a path that contains the model files",
+        ]
+        return "\n".join(lines)
+
+
 def load_config(path: Path) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
 
 
-def resolve_model_id(model: dict, base_dir: Path, project_root: Path) -> str:
-    """Determine the model ID the backend will report.
-
-    - vLLM/SGLang: reports the path passed to --model (absolute)
-    - llama.cpp: reports the GGUF filename
-
-    Returns absolute paths for vLLM/SGLang (matching how servers are started).
-    """
+def resolve_model_id(model: dict, base_dir: Path, project_root: Path) -> str:  # noqa: F811
+    """Backwards-compat wrapper. Delegates to resolve_gguf_filename / resolve_hf_path."""
+    # Kept for callers that import the old name; new code uses resolve_model_path.
     backend = model.get("backend", "vllm")
     local_dir = model.get("local_dir", "")
-
-    if backend in ("vllm", "sglang"):
-        return str(base_dir / local_dir)
-
     if backend == "llamacpp":
-        # Check if this is an embedding model (special case)
-        if model.get("phase") == "embedding":
-            # Embedding model: use the GGUF filename without path
-            gguf_dir = base_dir / local_dir
-            if gguf_dir.exists():
-                for f in sorted(gguf_dir.glob("*.gguf")):
-                    if f.suffix == ".gguf":
-                        return f.name
-            # Fallback: use repo_id last segment
-            repo_id = model.get("repo_id", "")
-            return repo_id.split("/")[-1] + ".gguf"
-
-        # llama.cpp reports the GGUF filename
-        gguf_dir = base_dir / local_dir
-        if gguf_dir.exists():
-            for f in sorted(gguf_dir.glob("*.gguf")):
-                if f.suffix == ".gguf":
-                    return f.name
-        # Fallback: construct from local_dir name
-        return Path(local_dir).name + ".gguf"
-
+        # Old signature: only one base_dir. Wrap in a list for the new helper.
+        return _legacy_resolve_gguf(model, base_dir)
     return str(base_dir / local_dir)
+
+
+def _legacy_resolve_gguf(model, base_dir):
+    """Single-base-dir variant of resolve_gguf_filename. Used by old callers."""
+    gguf_dir = base_dir / model.get("local_dir", "")
+    if gguf_dir.exists():
+        for f in sorted(gguf_dir.glob("*.gguf")):
+            if f.suffix == ".gguf":
+                return f.name
+    raise UnresolvableFilename(
+        model_name=model.get("name", "unknown"),
+        local_dir=model.get("local_dir", ""),
+        include_pattern=model.get("include"),
+        search_dirs_checked=[base_dir],
+    )
+
+
+def resolve_gguf_filename(model, search_dirs):
+    """Resolve the GGUF filename for a llamacpp model.
+
+    Tries each search_dir in order. First match wins. Raises:
+    - AmbiguousFilename: if multiple .gguf files exist in a single search_dir
+    - UnresolvableFilename: if no .gguf files exist in any search_dir
+    """
+    local_dir = model.get("local_dir", "")
+    include = model.get("include")
+
+    for search_dir in search_dirs:
+        gguf_dir = Path(search_dir) / local_dir
+        if not gguf_dir.exists():
+            continue
+        matches = sorted(p for p in gguf_dir.glob("*.gguf") if p.is_file())
+        if len(matches) > 1:
+            from glc_helpers import AmbiguousFilename  # see note
+            raise AmbiguousFilename(
+                model_name=model.get("name", "unknown"),
+                local_dir=local_dir,
+                include_pattern=include,
+                candidates=matches,
+                search_dir=search_dir,
+            )
+        if len(matches) == 1:
+            return matches[0].name
+
+    raise UnresolvableFilename(
+        model_name=model.get("name", "unknown"),
+        local_dir=local_dir,
+        include_pattern=include,
+        search_dirs_checked=[Path(d) for d in search_dirs],
+    )
 
 
 def generate_config(config: dict, project_root: Path) -> dict:
