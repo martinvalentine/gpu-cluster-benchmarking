@@ -28,6 +28,21 @@ FIELDNAMES = [
     "mean_tpot_ms", "p99_tpot_ms",
     "mean_itl_ms", "p99_itl_ms",
     "total_input_tokens", "total_generated_tokens",
+    "params.server.model", "params.server.endpoint", "params.server.port",
+    "params.server.tp_size", "params.server.max_model_len", "params.server.max_num_seqs",
+    "params.server.gpu_mem_util", "params.server.n_parallel", "params.server.ctx_size",
+    "params.server.batch", "params.server.ubatch", "params.server.threads",
+    "params.server.flash_attn", "params.server.cache_key", "params.server.cache_val",
+    "params.server.cache_prompt", "params.server.chunked_prefill", "params.server.prefix_caching",
+    "params.server.max_batched_tokens", "params.server.swap_space_gb",
+    "params.server.quantization", "params.server.dtype", "params.server.block_size",
+    "params.server.attention_backend", "params.server.radix_cache", "params.server.torch_compile",
+    "params.server.trust_remote_code", "params.server.max_total_tokens", "params.server.chunked_prefill_size",
+    "params.hardware.hostname", "params.hardware.gpu_name", "params.hardware.gpu_count",
+    "params.hardware.gpu_vram_mib", "params.hardware.driver_version", "params.hardware.cuda_version",
+    "params.hardware.cpu_name", "params.hardware.cpu_cores", "params.hardware.memory_gb",
+    "params.system.timestamp", "params.system.git_commit", "params.system.git_branch",
+    "params.system.docker_image", "params.system.server_version",
 ]
 
 BACKENDS = ["vllm", "llamacpp", "sglang"]
@@ -93,8 +108,39 @@ def empty_metrics() -> dict:
             if k not in ("model", "backend", "phase", "concurrency", "pp", "file")}
 
 
-def parse_vllm_json(data: dict) -> dict:
-    return {
+def _flatten_params(params: dict | None) -> dict:
+    """Flatten params.{server,hardware,system}.* into params.* top-level keys.
+
+    Returns an empty dict if params is None or empty, so old sweep JSONs without
+    a 'params' field parse to empty param columns (not an error).
+    """
+    out: dict = {}
+    if not params:
+        return out
+    for group in ("server", "hardware", "system"):
+        for k, v in (params.get(group) or {}).items():
+            out[f"params.{group}.{k}"] = v
+    return out
+
+
+def _load_params_from_dir(dir_path) -> "dict | None":
+    """Look for a params.json file in dir_path and return its contents.
+
+    Returns None if the file doesn't exist or is malformed. This is the
+    resolution strategy for formats that don't embed params in the result
+    file itself (sglang JSONL, llamacpp TSV).
+    """
+    params_file = dir_path / "params.json"
+    if not params_file.exists():
+        return None
+    try:
+        return json.loads(params_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def parse_vllm_json(data: dict, params: dict | None = None) -> dict:
+    result = {
         "successful_requests": data.get("completed", data.get("successful_requests", 0)),
         "failed_requests": data.get("failed_requests", 0),
         "duration_s": round(data.get("duration", 0), 2),
@@ -112,9 +158,11 @@ def parse_vllm_json(data: dict) -> dict:
         "total_input_tokens": data.get("total_input_tokens", 0),
         "total_generated_tokens": data.get("total_generated_tokens", 0),
     }
+    result.update(_flatten_params(params))
+    return result
 
 
-def parse_llama_benchy_json(data: dict, filename: str = "") -> list[dict]:
+def parse_llama_benchy_json(data: dict, filename: str = "", params: dict | None = None) -> list[dict]:
     results = data.get("results", [])
     benchmarks = data.get("benchmarks", [])
     use_benchmarks = bool(benchmarks)
@@ -148,12 +196,13 @@ def parse_llama_benchy_json(data: dict, filename: str = "") -> list[dict]:
             "mean_ttft_ms": round(ttft, 2) if use_benchmarks else round(ttft * 1000, 2) if ttft else 0,
             "duration_s": round(latency, 2) if latency else 0,
         })
+        flat_params = _flatten_params(params)
         rows.append({
             "model": model, "backend": "llamacpp",
             "phase": f"pp={pp}" if use_benchmarks else "llama-benchy",
             "pp": pp, "concurrency": conc,
             "file": filename or f"pp{pp}_conc{conc}",
-            **m,
+            **m, **flat_params,
         })
     return rows
 
@@ -213,8 +262,11 @@ def parse_llamacpp_tsv_dir(tsv_dir: Path, model: str, phase: str) -> list[dict]:
             "total_input_tokens": total_tokens,
             "total_generated_tokens": total_tokens,
         })
+        # Load params from sibling params.json (TSV doesn't embed params)
+        tsv_params = _load_params_from_dir(tsv_file.parent)
+        tsv_flat = _flatten_params(tsv_params)
         rows.append({"model": model, "backend": "llamacpp", "phase": phase, "pp": 0,
-                      "concurrency": conc, "file": tsv_file.name, **m})
+                      "concurrency": conc, "file": tsv_file.name, **m, **tsv_flat})
     return rows
 
 
@@ -279,7 +331,7 @@ def collect_results(results_dir: Path) -> list[dict]:
             print(f"  WARN: {json_file}: {e}", file=sys.stderr); continue
 
         if is_llama_benchy_file(json_file):
-            benchy_rows = parse_llama_benchy_json(data, json_file.name)
+            benchy_rows = parse_llama_benchy_json(data, json_file.name, params=data.get("params"))
             for r in benchy_rows:
                 r["file"] = json_file.name
                 rows.append(r)
@@ -291,7 +343,7 @@ def collect_results(results_dir: Path) -> list[dict]:
         model = model_map.get(run_name, run_name)
         conc = extract_concurrency(json_file.name)
 
-        metrics = parse_vllm_json(data)
+        metrics = parse_vllm_json(data, params=data.get("params"))
         metrics["tok_s_per_req"] = round(metrics["output_tok_s"] / conc, 2) if conc and metrics["output_tok_s"] else 0
         rows.append({"model": model, "backend": backend, "phase": phase, "pp": 0,
                       "concurrency": conc, "file": json_file.name, **metrics})
@@ -320,6 +372,10 @@ def collect_results(results_dir: Path) -> list[dict]:
         except OSError as e:
             print(f"  WARN: {jsonl_file}: {e}", file=sys.stderr); continue
 
+        # Load params from sibling params.json (sglang JSONL doesn't embed params in the result file itself)
+        sglang_params = _load_params_from_dir(jsonl_file.parent)
+        flat_params = _flatten_params(sglang_params)
+
         def avg(lst): return round(sum(lst) / len(lst), 2) if lst else 0
 
         m = empty_metrics()
@@ -330,7 +386,7 @@ def collect_results(results_dir: Path) -> list[dict]:
             "total_input_tokens": agg["inp"], "total_generated_tokens": agg["out"],
         })
         rows.append({"model": model, "backend": backend, "phase": phase, "pp": 0,
-                      "concurrency": conc, "file": jsonl_file.name, **m})
+                      "concurrency": conc, "file": jsonl_file.name, **m, **flat_params})
 
     # ── TSV files (llama.cpp) ────────────────────────────────
     processed_dirs = set()
@@ -501,6 +557,10 @@ def main():
     parser.add_argument("--all", action="store_true", help="Scan all session dirs under input")
     parser.add_argument("--md-only", action="store_true", help="Only generate markdown table")
     parser.add_argument("--csv-only", action="store_true", help="Only generate CSV (no report)")
+    parser.add_argument("--hide-params", action="store_true",
+                        help="Suppress the params.* columns in the CSV/TSV output")
+    parser.add_argument("--only-params", action="store_true",
+                        help="Show only the params.* columns (drop the metric columns)")
     args = parser.parse_args()
 
     input_dir = args.input.resolve()
@@ -528,8 +588,14 @@ def main():
         md_path = d / f"{prefix}_table.md"
 
         if not args.md_only:
+            if args.only_params:
+                fieldnames = [f for f in FIELDNAMES if f.startswith("params.")]
+            else:
+                fieldnames = list(FIELDNAMES)
+                if args.hide_params:
+                    fieldnames = [f for f in fieldnames if not f.startswith("params.")]
             with open(csv_path, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(rows)
             print(f"  CSV → {csv_path}  ({len(rows)} rows)")
