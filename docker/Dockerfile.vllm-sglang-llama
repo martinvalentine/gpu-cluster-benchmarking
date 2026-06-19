@@ -34,7 +34,7 @@ ARG UBUNTU_VERSION=2404
 # ── STAGE 1: Build llama-cpp-turboquant from submodule ───
 FROM nvidia/cuda:12.9.0-devel-ubuntu24.04 AS turboquant-build
 
-ARG CUDA_ARCH=8.6
+ARG CUDA_ARCH="8.6 12.0"
 ARG CMAKE_JOBS=8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -47,7 +47,6 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_
 RUN ln -sf /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so \
            /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so.1
 
-# Build directly from submodule — no prebuilt dir needed
 COPY third_party/llama-cpp-turboquant /src
 
 # Convert PyTorch format "8.0 8.6 8.9" → CMake format "80;86;89"
@@ -90,7 +89,6 @@ COPY --from=turboquant-build --chmod=755 /build/bin/llama-bench  /usr/local/bin/
 COPY --from=turboquant-build --chmod=644 /build/bin/*.so*        /usr/local/lib/
 RUN ldconfig
 
-# Verify both environments import cleanly at build time
 RUN python3 -c "import vllm; print('vLLM OK:', vllm.__version__)"
 RUN /opt/venv-sglang/bin/python3 -c "import sglang; print('SGLang OK:', sglang.__version__)"
 
