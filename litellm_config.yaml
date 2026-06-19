@@ -6,7 +6,7 @@ model_list:
     api_key: EMPTY
 - model_name: qwen0.5b-vllm
   litellm_params:
-    model: openai//workspace/models/hf/qwen2.5-0.6b
+    model: openai//workspace/models/hf/qwen2.5-0.5b
     api_base: http://localhost:8000/v1
     api_key: EMPTY
 - model_name: qwen0.5b-llamacpp
@@ -29,15 +29,10 @@ model_list:
     model: openai/qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf
     api_base: http://localhost:8001/v1
     api_key: EMPTY
-- model_name: qwen32b-vllm
+- model_name: qwen32b-awq-vllm
   litellm_params:
     model: openai//workspace/models/hf/qwen2.5-32b-awq
     api_base: http://localhost:8000/v1
-    api_key: EMPTY
-- model_name: qwen32b-llamacpp
-  litellm_params:
-    model: openai/qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf
-    api_base: http://localhost:8001/v1
     api_key: EMPTY
 router_settings:
   routing_strategy: least-busy
