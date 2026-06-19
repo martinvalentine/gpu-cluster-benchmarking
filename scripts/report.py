@@ -23,6 +23,70 @@ from pathlib import Path
 from statistics import mean, median
 
 
+def format_key_params(params):
+    """Render a Key Parameters markdown section from a params dict.
+
+    Returns an empty string if params is None or empty.
+    """
+    if not params:
+        return ""
+    s = (params.get("server") or {})
+    h = (params.get("hardware") or {})
+    sys_ = (params.get("system") or {})
+
+    def _v(x, default="—"):
+        return default if x in (None, "", "N/A") else x
+
+    rows = [
+        ("Model",             _v(s.get("model"))),
+        ("Endpoint",          _v(s.get("endpoint"))),
+        ("TP Size",           _v(s.get("tp_size"))),
+        ("Max Model Len",     _v(s.get("max_model_len"))),
+        ("Max Num Seqs",      _v(s.get("max_num_seqs"))),
+        ("GPU Mem Util",      _v(s.get("gpu_mem_util"))),
+        ("Flash Attn",        _v(s.get("flash_attn"))),
+        ("KV Cache",          f"K={_v(s.get('cache_key'))} V={_v(s.get('cache_val'))}"),
+        ("Prefix Caching",    _v(s.get("prefix_caching"))),
+        ("Chunked Prefill",   _v(s.get("chunked_prefill"))),
+        ("Attention Backend", _v(s.get("attention_backend"))),
+        ("Quantization",      _v(s.get("quantization"))),
+        ("Hardware",
+            f"{_v(h.get('gpu_count'), '0')}× {_v(h.get('gpu_name'))} "
+            f"({_v(h.get('gpu_vram_mib'), '0')} MiB)"),
+        ("CUDA / Driver",     f"{_v(h.get('cuda_version'))} / {_v(h.get('driver_version'))}"),
+        ("Git Commit",        f"{_v(sys_.get('git_commit'))} ({_v(sys_.get('git_branch'))})"),
+        ("Docker Image",      _v(sys_.get("docker_image"))),
+        ("Server Version",    _v(sys_.get("server_version"))),
+        ("Captured At",       _v(sys_.get("timestamp"))),
+    ]
+
+    lines = ["## Key Parameters", "", "| Field | Value |", "|-------|-------|"]
+    for label, val in rows:
+        lines.append(f"| {label} | {val} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def format_params_short(params):
+    """Short params summary for per-row table cells: model | port | ctk/ctv | gpu | git."""
+    if not params:
+        return "—"
+    s = (params.get("server") or {})
+    h = (params.get("hardware") or {})
+    sys_ = (params.get("system") or {})
+
+    def _v(x, default="—"):
+        return default if x in (None, "", "N/A") else x
+
+    return (
+        f"{_v(s.get('model'))} | "
+        f":{_v(s.get('port'))} | "
+        f"{_v(s.get('cache_key'))}/{_v(s.get('cache_val'))} | "
+        f"{_v(h.get('gpu_name'))} | "
+        f"{_v(sys_.get('git_commit'))}"
+    )
+
+
 def p99(arr):
     if not arr:
         return 0.0
@@ -195,29 +259,52 @@ def parse_llama_benchy_json(path):
 
 
 def collect_results(results_dir):
+    """Collect all benchmark results AND their associated server params.
+
+    For each result file, looks for a sibling `params.json` file (the snapshot
+    written by the bench script) and attaches its parsed contents as 'params'.
+    """
     results = []
 
     for f in sorted(results_dir.rglob("*.json")):
         if f.name == "ccu_sweep.json" or f.name.startswith("prompt_sweep_pp"):
             r = parse_llama_benchy_json(f)
-            if r:
-                results.append(r)
-            continue
-        r = parse_vllm_json(f)
+        else:
+            r = parse_vllm_json(f)
         if r:
+            params = _read_sibling_params(f.parent)
+            if params:
+                r["params"] = params
             results.append(r)
 
     for f in sorted(results_dir.rglob("*.jsonl")):
         r = parse_sglang_jsonl(f)
         if r:
+            params = _read_sibling_params(f.parent)
+            if params:
+                r["params"] = params
             results.append(r)
 
     for f in sorted(results_dir.rglob("*.tsv")):
         r = parse_llamacpp_tsv(f)
         if r:
+            params = _read_sibling_params(f.parent)
+            if params:
+                r["params"] = params
             results.append(r)
 
     return results
+
+
+def _read_sibling_params(dir_path):
+    """Read params.json from dir_path. Returns dict or None."""
+    params_file = dir_path / "params.json"
+    if not params_file.exists():
+        return None
+    try:
+        return json.loads(params_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def print_table(rows):
@@ -235,37 +322,90 @@ def print_table(rows):
     print()
 
 
-def write_markdown(rows, output_path):
+def write_markdown(rows, output_path, include_params=True):
+    """Write markdown report. If include_params is True, render a Key Parameters
+    section at the top and a Params column in per-row tables.
+    """
+    if not rows:
+        return
+
     lines = [
         "# Benchmark Report",
         "",
         f"Generated from: `{output_path.parent}`",
         "",
-        "## Summary",
-        "",
-        "| Framework | File | Requests | TTFT (ms) | TPOT (ms) | tok/s |",
-        "|-----------|------|----------|-----------|-----------|-------|",
     ]
 
-    for r in rows:
-        lines.append(
-            f"| {r['framework']} | {r['file']} | {r['successful']} | "
-            f"{r['mean_ttft']:.1f} | {r['mean_tpot']:.2f} | {r['output_tok_s']:.1f} |"
-        )
+    # ── Key Parameters section ──
+    if include_params:
+        first_params = None
+        for r in rows:
+            if r.get("params"):
+                first_params = r["params"]
+                break
+        key_params_md = format_key_params(first_params)
+        if key_params_md:
+            lines.append(key_params_md)
 
-    lines.extend([
-        "",
-        "## Detailed Metrics",
-        "",
-        "| Framework | File | P99 TTFT | P99 TPOT | P99 ITL | Failed |",
-        "|-----------|------|----------|----------|---------|--------|",
-    ])
+    # ── Summary table (with optional Params column) ──
+    if include_params and any(r.get("params") for r in rows):
+        lines.extend([
+            "## Summary",
+            "",
+            "| Framework | File | Requests | TTFT (ms) | TPOT (ms) | tok/s | Params |",
+            "|-----------|------|----------|-----------|-----------|-------|--------|",
+        ])
+    else:
+        lines.extend([
+            "## Summary",
+            "",
+            "| Framework | File | Requests | TTFT (ms) | TPOT (ms) | tok/s |",
+            "|-----------|------|----------|-----------|-----------|-------|",
+        ])
 
     for r in rows:
-        lines.append(
-            f"| {r['framework']} | {r['file']} | "
-            f"{r['p99_ttft']:.1f} | {r['p99_tpot']:.2f} | {r['p99_itl']:.2f} | {r['failed']} |"
-        )
+        if include_params and r.get("params"):
+            lines.append(
+                f"| {r['framework']} | {r['file']} | {r['successful']} | "
+                f"{r['mean_ttft']:.1f} | {r['mean_tpot']:.2f} | {r['output_tok_s']:.1f} | "
+                f"{format_params_short(r.get('params'))} |"
+            )
+        else:
+            lines.append(
+                f"| {r['framework']} | {r['file']} | {r['successful']} | "
+                f"{r['mean_ttft']:.1f} | {r['mean_tpot']:.2f} | {r['output_tok_s']:.1f} |"
+            )
+
+    # ── Detailed Metrics table (with optional Params column) ──
+    if include_params and any(r.get("params") for r in rows):
+        lines.extend([
+            "",
+            "## Detailed Metrics",
+            "",
+            "| Framework | File | P99 TTFT | P99 TPOT | P99 ITL | Failed | Params |",
+            "|-----------|------|----------|----------|---------|--------|--------|",
+        ])
+    else:
+        lines.extend([
+            "",
+            "## Detailed Metrics",
+            "",
+            "| Framework | File | P99 TTFT | P99 TPOT | P99 ITL | Failed |",
+            "|-----------|------|----------|----------|---------|--------|",
+        ])
+
+    for r in rows:
+        if include_params and r.get("params"):
+            lines.append(
+                f"| {r['framework']} | {r['file']} | "
+                f"{r['p99_ttft']:.1f} | {r['p99_tpot']:.2f} | {r['p99_itl']:.2f} | {r['failed']} | "
+                f"{format_params_short(r.get('params'))} |"
+            )
+        else:
+            lines.append(
+                f"| {r['framework']} | {r['file']} | "
+                f"{r['p99_ttft']:.1f} | {r['p99_tpot']:.2f} | {r['p99_itl']:.2f} | {r['failed']} |"
+            )
 
     output_path.write_text("\n".join(lines) + "\n")
 
@@ -285,6 +425,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--results-dir", "-d", type=Path, default=Path("results"))
     parser.add_argument("--markdown", action="store_true", help="Only generate markdown report")
+    parser.add_argument("--no-params", action="store_true", help="Suppress the Key Parameters section and the per-row params column")
     args = parser.parse_args()
 
     results_dir = args.results_dir.resolve()
@@ -315,7 +456,7 @@ def main():
     print(f"  CSV:  {csv_path}")
 
     md_path = results_dir / "report.md"
-    write_markdown(rows, md_path)
+    write_markdown(rows, md_path, include_params=not args.no_params)
     print(f"  MD:   {md_path}")
     print()
 
