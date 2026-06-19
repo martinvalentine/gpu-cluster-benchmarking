@@ -187,3 +187,46 @@ Outputs:
 ```bash
 uv run ./scripts/monitor-gpu.sh -i 2 -d 300
 ```
+
+## Inspecting Server Params After a Run
+
+When a benchmark result is unexpectedly slow, the question is almost always
+"what was the server actually configured with?" — model size, KV cache type,
+attention backend, TP size, GPU memory utilization. These are now captured
+automatically.
+
+**What gets written:**
+
+| File | When | What |
+|---|---|---|
+| `results/<backend>/_active_params.json` | When `run-*.sh` starts a server | Full server config + hardware + system info for the currently-running server. Overwritten on the next server start. |
+| `results/<backend>/<session>/params.json` | At sweep start | Snapshot copy of `_active_params.json`, frozen for that sweep. |
+| `params` field in sweep JSON | After sweep completes | Embedded by `jq` into the sweep JSON so the params travel with the result. |
+
+**Where to look in the report:**
+
+- `report.py` renders a `## Key Parameters` section near the top with the
+  most important fields (model, ctk/ctv, flash_attn, GPU, git commit)
+- Per-row tables gain a `Params` column showing model, port, ctk/ctv, GPU, and
+  commit for each row at a glance
+- `parse_bench.py` adds flat `params.*` columns to the summary CSV (use
+  `--hide-params` to suppress, `--only-params` for a params-only view)
+
+**Quick check on the command line:**
+
+```bash
+# What model + cache type was the last server started with?
+jq -r '"\(.server.model) ctk=\(.server.cache_key) ctv=\(.server.cache_val) fa=\(.server.flash_attn)"' \
+  results/vllm/_active_params.json
+
+# What GPU + CUDA?
+jq -r '"\(.hardware.gpu_count)x \(.hardware.gpu_name) (cuda \(.hardware.cuda_version))"' \
+  results/vllm/_active_params.json
+```
+
+**Manual override:**
+
+If the server was started outside the `run-*.sh` scripts (e.g. directly via
+`vllm serve` in tmux), the `params.json` won't be auto-written. To capture
+params retroactively, run the `run-*.sh` script once with the same flags — it
+will create `_active_params.json` without affecting the already-running server.
