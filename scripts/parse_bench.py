@@ -162,7 +162,7 @@ def parse_vllm_json(data: dict, params: dict | None = None) -> dict:
     return result
 
 
-def parse_llama_benchy_json(data: dict, filename: str = "", params: dict | None = None) -> list[dict]:
+def parse_llama_benchy_json(data: dict, filename: str = "", params: dict | None = None, backend: str = "llamacpp") -> list[dict]:
     results = data.get("results", [])
     benchmarks = data.get("benchmarks", [])
     use_benchmarks = bool(benchmarks)
@@ -198,7 +198,7 @@ def parse_llama_benchy_json(data: dict, filename: str = "", params: dict | None 
         })
         flat_params = _flatten_params(params)
         rows.append({
-            "model": model, "backend": "llamacpp",
+            "model": model, "backend": backend,
             "phase": f"pp={pp}" if use_benchmarks else "llama-benchy",
             "pp": pp, "concurrency": conc,
             "file": filename or f"pp{pp}_conc{conc}",
@@ -331,7 +331,7 @@ def collect_results(results_dir: Path) -> list[dict]:
             print(f"  WARN: {json_file}: {e}", file=sys.stderr); continue
 
         if is_llama_benchy_file(json_file):
-            benchy_rows = parse_llama_benchy_json(data, json_file.name, params=data.get("params"))
+            benchy_rows = parse_llama_benchy_json(data, json_file.name, params=data.get("params"), backend=detect_backend(json_file))
             for r in benchy_rows:
                 r["file"] = json_file.name
                 rows.append(r)
