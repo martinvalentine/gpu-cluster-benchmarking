@@ -44,6 +44,33 @@ class UnresolvableFilename(Exception):
         return "\n".join(lines)
 
 
+class AmbiguousFilename(Exception):
+    """Multiple GGUF files matched in a single search dir."""
+
+    def __init__(self, model_name, local_dir, include_pattern, candidates, search_dir):
+        self.model_name = model_name
+        self.local_dir = local_dir
+        self.include_pattern = include_pattern
+        self.candidates = candidates
+        self.search_dir = search_dir
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        lines = [
+            f"Ambiguous GGUF match for '{self.model_name}' in {self.search_dir}/{self.local_dir}/",
+            f"Include pattern: {self.include_pattern!r}",
+            "Multiple candidates:",
+        ]
+        for c in self.candidates:
+            lines.append(f"  {c.name}")
+        lines += [
+            "Remediation:",
+            "  - Move all but one file out of the directory, or",
+            "  - Tighten the 'include' pattern in models.yaml to match exactly one file",
+        ]
+        return "\n".join(lines)
+
+
 def load_config(path: Path) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
@@ -91,7 +118,6 @@ def resolve_gguf_filename(model, search_dirs):
             continue
         matches = sorted(p for p in gguf_dir.glob("*.gguf") if p.is_file())
         if len(matches) > 1:
-            from glc_helpers import AmbiguousFilename  # see note
             raise AmbiguousFilename(
                 model_name=model.get("name", "unknown"),
                 local_dir=local_dir,

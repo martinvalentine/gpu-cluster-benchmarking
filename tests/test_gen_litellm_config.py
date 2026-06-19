@@ -66,6 +66,47 @@ def test_gguf_finds_file_in_second_search_dir(tmp_path):
     assert result == "model-q4_k_m.gguf"
 
 
+# T5: multiple .gguf files in a single search dir → raises AmbiguousFilename
+def test_gguf_multiple_matches_raises_ambiguous(tmp_path):
+    """Multiple .gguf files in the same dir → AmbiguousFilename with candidate list."""
+    model_dir = tmp_path / "gguf" / "test-model"
+    model_dir.mkdir(parents=True)
+    (model_dir / "model-q4_k_m.gguf").write_bytes(b"\x00" * 100)
+    (model_dir / "model-q8_0.gguf").write_bytes(b"\x00" * 100)
+
+    model = {
+        "name": "test-model",
+        "backend": "llamacpp",
+        "local_dir": "gguf/test-model",
+        "include": "*q4_k_m.gguf",
+    }
+    with pytest.raises(glc.AmbiguousFilename) as exc_info:
+        glc.resolve_gguf_filename(model, [tmp_path])
+    # Verify the exception lists the candidates
+    assert "model-q4_k_m.gguf" in str(exc_info.value)
+    assert "model-q8_0.gguf" in str(exc_info.value)
+
+
+# T8: embedding model (special case) — returns just filename, no path
+def test_gguf_embedding_model_returns_filename_only(tmp_path):
+    """Embedding model: GGUF filename without any path prefix."""
+    model_dir = tmp_path / "gguf" / "qwen3-embedding-0.6b"
+    model_dir.mkdir(parents=True)
+    (model_dir / "Qwen3-Embedding-0.6B-Q8_0.gguf").write_bytes(b"\x00" * 100)
+
+    model = {
+        "name": "qwen3-embedding",
+        "backend": "llamacpp",
+        "phase": "embedding",
+        "local_dir": "gguf/qwen3-embedding-0.6b",
+        "include": "*Q8_0.gguf",
+    }
+    result = glc.resolve_gguf_filename(model, [tmp_path])
+    assert result == "Qwen3-Embedding-0.6B-Q8_0.gguf"
+    # No path prefix — just the filename
+    assert "/" not in result
+
+
 # --- Tests T12–T14: generate_config integration ---
 # (added in task 10)
 
