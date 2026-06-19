@@ -136,6 +136,60 @@ def test_hf_path_non_strict_returns_path_even_if_missing(tmp_path):
     assert result == str(missing / "hf" / "missing")
 
 
+# T9: dispatcher routes llamacpp → resolve_gguf_filename
+def test_dispatcher_routes_llamacpp(tmp_path, monkeypatch):
+    """Dispatcher calls resolve_gguf_filename for llamacpp models."""
+    model = {
+        "name": "test", "backend": "llamacpp", "local_dir": "gguf/missing",
+        "include": "*q4_k_m.gguf",
+    }
+    called_with = []
+    real_gguf = glc.resolve_gguf_filename
+
+    def spy(model, search_dirs):
+        called_with.append((model["name"], tuple(search_dirs)))
+        return real_gguf(model, search_dirs)
+
+    monkeypatch.setattr(glc, "resolve_gguf_filename", spy)
+    with pytest.raises(glc.UnresolvableFilename):
+        glc.resolve_model_path(model, [tmp_path], strict=False)
+    assert called_with == [("test", (tmp_path,))]
+
+
+# T10: dispatcher routes vllm → resolve_hf_path
+def test_dispatcher_routes_vllm(tmp_path, monkeypatch):
+    """Dispatcher calls resolve_hf_path for vllm models."""
+    # Create the path so the spy's delegation to the real helper doesn't raise.
+    (tmp_path / "hf" / "test").mkdir(parents=True)
+    model = {"name": "test", "backend": "vllm", "local_dir": "hf/test"}
+    called_with = []
+    real_hf = glc.resolve_hf_path
+
+    def spy(model, search_dirs, strict):
+        called_with.append((model["backend"], tuple(search_dirs), strict))
+        return real_hf(model, search_dirs, strict)
+
+    monkeypatch.setattr(glc, "resolve_hf_path", spy)
+    glc.resolve_model_path(model, [tmp_path], strict=True)
+    assert called_with == [("vllm", (tmp_path,), True)]
+
+
+# T11: dispatcher routes sglang → resolve_hf_path
+def test_dispatcher_routes_sglang(tmp_path, monkeypatch):
+    """Dispatcher calls resolve_hf_path for sglang models (same as vllm)."""
+    model = {"name": "test", "backend": "sglang", "local_dir": "hf/test"}
+    called_with = []
+    real_hf = glc.resolve_hf_path
+
+    def spy(model, search_dirs, strict):
+        called_with.append((model["backend"], tuple(search_dirs), strict))
+        return real_hf(model, search_dirs, strict)
+
+    monkeypatch.setattr(glc, "resolve_hf_path", spy)
+    glc.resolve_model_path(model, [tmp_path], strict=False)
+    assert called_with == [("sglang", (tmp_path,), False)]
+
+
 # --- Tests T12–T14: generate_config integration ---
 # (added in task 10)
 

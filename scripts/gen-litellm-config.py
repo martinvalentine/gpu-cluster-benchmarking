@@ -153,6 +153,19 @@ def resolve_hf_path(model, search_dirs, strict):
     return str(path)
 
 
+def resolve_model_path(model, search_dirs, strict):
+    """Thin dispatcher. Routes to the backend-specific resolver.
+
+    Branching lives entirely inside this function — main() never
+    switches on model['backend'] directly. The `strict` flag is
+    consumed only by the HF helper; GGUF resolution failures are
+    always hard (no silent fallback to construct a fake filename).
+    """
+    if model.get("backend") == "llamacpp":
+        return resolve_gguf_filename(model, search_dirs)
+    return resolve_hf_path(model, search_dirs, strict)
+
+
 def generate_config(config: dict, project_root: Path) -> dict:
     """Generate litellm_config.yaml content from models.yaml."""
     ports = config.get("ports", {})
