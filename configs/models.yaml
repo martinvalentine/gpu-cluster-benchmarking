@@ -10,7 +10,6 @@
 # uv run python scripts/gen-litellm-config.py
 # uv run python scripts/bench-models.sh --phase p0 p1 --concurrent 1200 ...
 
-# ============================================================
 # ── Cluster Configuration (5× NVIDIA A40) ─────────────────────
 cluster:
   gpu_count: 5
@@ -41,9 +40,13 @@ cluster:
     flash_attn: on
     cache_prompt: true
 
+  sglang:
+    mem_fraction: "0.85"
+    max_model_len: 4096
+
 # Benchmark dataset
 dataset:
-  sharegpt: /workspace/datasets/sharegpt.json
+  sharegpt: datasets/sharegpt.json
 
 # Base directory
 base_dir: /workspace/models
@@ -73,7 +76,7 @@ models:
   # ── Phase P0: Ultra-Light (0.5B) ───────────────────────────
   - name: qwen0.5b
     repo_id: Qwen/Qwen2.5-0.5B-Instruct
-    local_dir: hf/qwen2.5-0.6b
+    local_dir: hf/qwen2.5-0.5b
     format: hf
     enabled: true
     phase: p0
@@ -85,9 +88,21 @@ models:
     vllm_max_seqs: 1536
     vllm_max_batched_tokens: 65536
 
+  - name: qwen0.5b-sglang
+    repo_id: Qwen/Qwen2.5-0.5B-Instruct
+    local_dir: hf/qwen2.5-0.5b
+    format: hf
+    enabled: true
+    phase: p0
+    backend: sglang
+    proxy_name: qwen0.5b-sglang
+    endpoint: true
+    sglang_mem_fraction: "0.75"
+    sglang_max_model_len: 16384
+
   - name: qwen0.5b-gguf
     repo_id: Qwen/Qwen2.5-0.5B-Instruct-GGUF
-    local_dir: gguf/qwen2.5-0.6b
+    local_dir: gguf/qwen2.5-0.5b
     format: gguf
     include: "*q4_k_m.gguf"
     enabled: true
@@ -121,6 +136,18 @@ models:
     vllm_max_seqs: 768
     vllm_max_batched_tokens: 65536
     vllm_max_model_len: 16384
+
+  - name: qwen7b-sglang
+    repo_id: Qwen/Qwen2.5-7B-Instruct
+    local_dir: hf/qwen2.5-7b
+    format: hf
+    enabled: true
+    phase: p1
+    backend: sglang
+    proxy_name: qwen7b-sglang
+    endpoint: true
+    sglang_mem_fraction: "0.82"
+    sglang_max_model_len: 16384
 
   - name: qwen7b-gguf
     repo_id: Qwen/Qwen2.5-7B-Instruct-GGUF
@@ -179,14 +206,14 @@ models:
     llamacpp_cache_prompt: true
 
   # ── Phase P3: Heavy (32B) ──────────────────────────────────
-  - name: qwen32b
-    repo_id: Qwen/Qwen2.5-32B-Instruct
-    local_dir: hf/qwen2.5-32b
+  - name: qwen32b-awq
+    repo_id: Qwen/Qwen2.5-32B-Instruct-AWQ
+    local_dir: hf/qwen2.5-32b-awq
     format: hf
     enabled: true
     phase: p3
     backend: vllm
-    proxy_name: qwen32b-vllm
+    proxy_name: qwen32b-awq-vllm
     endpoint: true
     vllm_tp: 5                     # Full 5 GPUs
     vllm_gpu_mem: "0.82"           # Headroom KV cache
@@ -201,10 +228,11 @@ models:
     local_dir: gguf/qwen2.5-32b
     format: gguf
     include: "qwen2.5-32b-instruct-q4_k_m*"
-    enabled: true
+    # disabled: Q4_K_M weights missing on disk (broken symlink to wrong model). Re-run download-models.py to populate.
+    enabled: false
     phase: p3
     backend: llamacpp
-    proxy_name: qwen32b-llamacpp
+    proxy_name: qwen32b-awq-llamacpp
     endpoint: true
     llamacpp_n_parallel: 12        # Thấp để ổn định
     llamacpp_tensor_split: "1,1,1,1,1"
