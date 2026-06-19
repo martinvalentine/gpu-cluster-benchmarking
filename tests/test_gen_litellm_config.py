@@ -325,6 +325,39 @@ def test_main_collects_all_hard_errors_no_early_exit(tmp_path, capsys):
     assert "2 hard error" in captured.err
 
 
+# T20: Summary formatter marks HF-missing models as WARN with path message
+def test_summary_marks_hf_missing_as_warn(capsys):
+    """Summary lists HF-missing models with WARN tag and a specific path message."""
+    import sys as _sys
+    litellm_config = {
+        "model_list": [
+            {"model_name": "ok-model",
+             "litellm_params": {"model": "openai/ok.gguf", "api_base": "http://x", "api_key": "EMPTY"}},
+            {"model_name": "warn-model",
+             "litellm_params": {"model": "openai/missing/path", "api_base": "http://y", "api_key": "EMPTY"}},
+        ],
+    }
+    config = {}  # not used by print_summary
+
+    class FakeArgs:
+        base_dirs = None
+        config = Path("config.yaml")
+        output = Path("out.yaml")
+        preview = False
+
+    soft_warnings = [
+        ("warn-model", "/missing/path not found in /missing"),
+    ]
+    glc.print_summary(
+        litellm_config, config, Path("."), FakeArgs(),
+        file=_sys.stderr, soft_warnings=soft_warnings,
+    )
+    captured = capsys.readouterr()
+    assert "OK    ok-model" in captured.err
+    assert "WARN  warn-model" in captured.err
+    assert "/missing/path not found" in captured.err
+
+
 # (added in tasks 8, 9, 10)
 
 
