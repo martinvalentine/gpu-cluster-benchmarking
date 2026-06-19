@@ -18,7 +18,7 @@ Requires at least one server running (see [run.md](run.md)) and a dataset (see b
 Dataset path is configured in `configs/models.yaml`:
 ```yaml
 dataset:
-  sharegpt: /workspace/datasets/sharegpt.json
+  sharegpt: datasets/sharegpt.json
 ```
 
 ## Per-Model Benchmark Loop (Recommended)
@@ -92,7 +92,7 @@ Use `-b vllm` or `-b llamacpp` to run only one backend at a time.
 Direct HTTP benchmark — tests single user latency, concurrent throughput, and long context.
 
 ```bash
-uv run ./scripts/benchmark/bench-llamacpp.sh [OPTIONS]
+uv run ./scripts/benchmark/llamacpp_bench.sh [OPTIONS]
 ```
 
 **Parameters:**
@@ -113,7 +113,7 @@ uv run ./scripts/benchmark/bench-llamacpp.sh [OPTIONS]
 ## vLLM Benchmark
 
 ```bash
-uv run ./scripts/benchmark/bench-vllm.sh [OPTIONS]
+uv run ./scripts/benchmark/vllm_bench.sh --full [OPTIONS]
 ```
 
 **Parameters:**
@@ -128,14 +128,14 @@ uv run ./scripts/benchmark/bench-vllm.sh [OPTIONS]
 **Examples:**
 
 ```bash
-uv run ./scripts/benchmark/bench-vllm.sh -p p1
-uv run ./scripts/benchmark/bench-vllm.sh -p p3 -m /workspace/models/hf/qwen2.5-32b-awq
+uv run ./scripts/benchmark/vllm_bench.sh --full -p p1
+uv run ./scripts/benchmark/vllm_bench.sh --full -p p3 -m /workspace/models/hf/qwen2.5-32b-awq
 ```
 
 ## SGLang Benchmark
 
 ```bash
-uv run ./scripts/benchmark/bench-sglang.sh [OPTIONS]
+uv run ./scripts/benchmark/sglang_bench.sh --full [OPTIONS]
 ```
 
 **Parameters:**

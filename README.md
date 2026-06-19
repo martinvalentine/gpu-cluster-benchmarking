@@ -29,9 +29,11 @@ gpu-cluster-benchmarking/
 │   │   ├── run-embedding-server.sh  # Embedding server (port 8003)
 │   │   └── run-proxy.sh             # LiteLLM proxy (port 4000)
 │   ├── benchmark/                   # Benchmark runners
-│   │   ├── bench-vllm.sh            # vLLM: vllm bench serve
-│   │   ├── bench-sglang.sh          # SGLang: sglang.bench_serving
-│   │   ├── bench-llamacpp.sh        # llama.cpp: direct HTTP tests
+│   │   ├── vllm_bench.sh            # vLLM: llama-benchy sweeps + native
+│   │   ├── sglang_bench.sh          # SGLang: llama-benchy sweeps + native
+│   │   ├── llamacpp_bench.sh        # llama.cpp: single/concurrent/long-context
+│   │   ├── find_best_np_llama.sh    # llama.cpp: -np sweep for throughput knee
+│   │   ├── bench.sh                 # Unified dispatcher (routes -b flag)
 │   │   ├── bench-litellm.sh         # LiteLLM async/locust
 │   │   ├── bench-litellm-async.py
 │   │   └── bench-litellm-locust.py
@@ -40,37 +42,45 @@ gpu-cluster-benchmarking/
 │   │   ├── build-vllm.sh
 │   │   └── build-sglang.sh
 │   ├── bench-models.sh              # Per-model benchmark orchestrator
+│   ├── run-all-benchmarks.sh        # Master runner — all frameworks sequentially
+│   ├── run-pipeline.sh              # Full pipeline: download → bench → report
 │   ├── start-all-tmux.sh            # Start all servers in tmux
 │   ├── stop-all.sh                  # Stop all servers
-│   ├── download-models.py           # Batch download from HuggingFace
+│   ├── prepare-dataset.sh           # Download & prepare benchmark dataset
+│   ├── download-models.py           # Config-driven HuggingFace batch download
 │   ├── gen-litellm-config.py        # Generate litellm_config.yaml
-│   ├── run-all-benchmarks.sh        # Master benchmark runner
-│   ├── run-pipeline.sh              # Full pipeline: download → bench → report
-│   ├── report.py                    # Generate formatted report (CSV + markdown)
-│   ├── parse-results.py             # Aggregate results → CSV
+│   ├── parse_bench.py               # Aggregate JSON → CSV/TSV/markdown
+│   ├── report.py                    # Generate formatted report (terminal + CSV + markdown)
+│   ├── visualize_cross_sweep.py     # Cross-sweep PNG charts
 │   ├── monitor-gpu.sh               # Real-time GPU monitoring
+│   ├── litellm-semantic-cache.py    # Standalone semantic cache demo
 │   ├── test-all.sh                  # Test all LLM endpoints
-│   ├── init-bare-machine.sh         # Bare metal setup
+│   ├── init-bare-machine.sh         # Bare metal machine setup
 │   ├── docker/
-│   │   └── start.sh                 # Container entrypoint (RunPod)
+│   │   ├── start.sh                 # Container entrypoint
+│   │   └── docker-bench.sh          # Host-side benchmark wrapper
 │   └── test/
-│       ├── test-llm.sh              # Test LLM endpoints
+│       ├── test-llm.sh              # Test individual LLM endpoints
 │       └── test-proxy.sh            # Test LiteLLM proxy
 ├── configs/
-│   └── models.yaml                  # Model config + cluster settings
+│   └── models.yaml                  # Model config + cluster settings (single source of truth)
 ├── docs/                            # Documentation
 │   ├── setup.md                     # Environment setup
 │   ├── build.md                     # Build llama-cpp-turboquant
 │   ├── run.md                       # Start servers (all params)
 │   ├── download-models.md           # Download models
-│   ├── benchmark.md                 # Run benchmarks (all params)
-│   ├── config.md                    # Config files reference
-│   └── params.md                    # Full parameter reference for models.yaml
+│   ├── benchmark.md                 # Run benchmarks (phases, params, pipeline)
+│   ├── config.md                    # Config files, env vars, options
+│   ├── params.md                    # Full parameter reference for models.yaml
+│   ├── docker.md                    # Docker images — Harmony image build/run/verify
+│   ├── benchmark-guide.md           # End-to-end benchmark workflow
+│   ├── benchmark-architecture.md     # Architecture diagrams + GPU allocation
+│   └── serving-frameworks-params.md # Full vLLM/SGLang/llama.cpp parameter reference
 ├── pyproject.toml                   # uv dependency groups
 ├── litellm_config.yaml              # LiteLLM proxy config (auto-generated)
 ├── docker/
 │   └── Dockerfile.vllm-sglang-llama   # Harmony image (vLLM + SGLang + llama-cpp-turboquant)
-└── benchmark_plan.md                # Benchmark strategy
+└── dev_benchmark_plan.md            # Benchmark strategy (dev notes)
 ```
 
 ## Quick Start
@@ -91,7 +101,7 @@ redis-server --daemonize yes
 uv run python scripts/download-models.py
 
 # 5. Prepare benchmark dataset
-./scripts/prepare-dataset.sh                    # → /workspace/datasets/sharegpt.json
+./scripts/prepare-dataset.sh                    # → datasets/sharegpt.json
 
 # 6. Start all servers in tmux (reads configs/models.yaml)
 ./scripts/start-all-tmux.sh
@@ -147,7 +157,7 @@ configs/models.yaml
 
 **Orchestrator scripts** (`bench-models.sh`, `start-all-tmux.sh`) read `configs/models.yaml` directly — no env vars needed.
 
-**Individual scripts** (`run-vllm.sh`, `bench-vllm.sh`, etc.) load `.env` from project root, then accept env vars:
+**Individual scripts** (`run-vllm.sh`, `vllm_bench.sh`, etc.) load `.env` from project root, then accept env vars:
 
 ```bash
 # Copy template and customize
@@ -166,32 +176,41 @@ VLLM_MODEL=/workspace/models/hf/qwen2.5-32b-awq VLLM_QUANT=awq ./scripts/run/run
 
 ### Cluster Configuration
 
-Edit `configs/models.yaml` to match your pod's GPU count:
+Edit `configs/models.yaml` to match your pod's GPU count. Defaults below match the shipped config for 5× NVIDIA A40 48GB:
 
 ```yaml
 cluster:
-  gpu_count: 0              # 0 = auto-detect from nvidia-smi
+  gpu_count: 5              # 0 = auto-detect from nvidia-smi
 
   vllm:
-    tp: 1                   # Tensor parallel size
-    gpu_mem_util: "0.87"    # GPU memory utilization
-    max_model_len: 4096     # Max context length
+    tp: 5                   # Tensor parallel size
+    gpu_mem_util: "0.85"    # GPU memory utilization
+    max_model_len: 16384    # Max context length
+    max_num_seqs: 1024
+    max_batched_tokens: 65536
 
   llamacpp:
-    n_parallel: 4           # Concurrent slots
-    ctx_size: 4096          # Context window
+    n_parallel: 48          # Concurrent slots
+    ctx_size: 16384         # Context window
+    batch: 8192
+    ubatch: 2048
+    cache_val: turbo4
+
+  sglang:
+    mem_fraction: "0.85"
+    max_model_len: 4096
 
 # Benchmark dataset path
 dataset:
-  sharegpt: /workspace/datasets/sharegpt.json
+  sharegpt: datasets/sharegpt.json
 ```
 
 Per-model overrides take precedence:
 ```yaml
 - name: qwen32b-awq
-  vllm_tp: 6               # Override cluster default
-  vllm_gpu_mem: "0.87"
-  vllm_quant: awq
+  vllm_tp: 5               # Match your GPU count for large models
+  vllm_gpu_mem: "0.82"     # Override cluster default
+  vllm_max_seqs: 192
 ```
 
 Models requiring more GPUs than `cluster.gpu_count` are auto-skipped by `bench-models.sh`.
@@ -217,6 +236,9 @@ uv run python scripts/download-models.py --dry-run
 | [docs/config.md](docs/config.md) | Config files, env vars, options reference |
 | [docs/params.md](docs/params.md) | Full parameter reference for `configs/models.yaml` |
 | [docs/docker.md](docs/docker.md) | Docker images — Harmony image build, run, verify |
+| [docs/benchmark-guide.md](docs/benchmark-guide.md) | Complete benchmark guide — hosting, sweeps, parsing, visualization |
+| [docs/benchmark-architecture.md](docs/benchmark-architecture.md) | Architecture diagrams, GPU allocation, metrics reference |
+| [docs/serving-frameworks-params.md](docs/serving-frameworks-params.md) | Parameter reference for vLLM, SGLang, and llama.cpp |
 
 ## Scripts Reference
 
@@ -231,13 +253,13 @@ uv run python scripts/download-models.py --dry-run
 | `scripts/run/run-sglang.sh` | Start SGLang (RadixAttention + torch.compile) |
 | `scripts/run/run-embedding-server.sh` | Start embedding server for semantic cache |
 | `scripts/run/run-proxy.sh` | Start LiteLLM proxy with Redis cache |
-| `scripts/benchmark/bench-llamacpp.sh` | llama.cpp benchmark (single/concurrent/long context) |
-| `scripts/benchmark/bench-vllm.sh` | vLLM benchmark (vllm bench serve) |
-| `scripts/benchmark/bench-sglang.sh` | SGLang benchmark (sglang.bench_serving) |
+| `scripts/benchmark/llamacpp_bench.sh` | llama.cpp benchmark (single/concurrent/long context) |
+| `scripts/benchmark/vllm_bench.sh` | vLLM benchmark (vllm bench serve) |
+| `scripts/benchmark/sglang_bench.sh` | SGLang benchmark (sglang.bench_serving) |
 | `scripts/benchmark/bench-litellm.sh` | LiteLLM async/locust load test |
 | `scripts/run-all-benchmarks.sh` | Master runner — all frameworks sequentially |
 | `scripts/run-pipeline.sh` | Full pipeline: download → benchmark → parse |
-| `scripts/parse-results.py` | Aggregate JSON → CSV summary |
+| `scripts/parse_bench.py` | Aggregate JSON → CSV summary |
 | `scripts/report.py` | Generate formatted report (terminal + CSV + markdown) |
 | `scripts/monitor-gpu.sh` | Real-time GPU monitoring with CSV logging |
 | `scripts/download-models.py` | Config-driven HuggingFace batch download |
@@ -247,11 +269,14 @@ uv run python scripts/download-models.py --dry-run
 
 | Group | Packages | Purpose |
 |-------|----------|---------|
-| `common` | huggingface-hub, aiohttp, pandas, numpy, tqdm, transformers, prometheus-client, psutil, gputil, redis | Base utilities & monitoring |
-| `vllm` | vllm (from source) | PagedAttention + Continuous Batching |
-| `sglang` | sglang (from source) | RadixAttention + Chunk Prefill + FlashInfer |
-| `benchmark` | locust, aiohttp, pandas, numpy, tqdm, transformers | Load testing tools |
+| `common` | huggingface-hub, pyyaml, aiohttp, pandas, numpy, tqdm, transformers, prometheus-client, psutil, gputil, redis, requests, datasets, pyarrow | Base utilities, config loading, monitoring |
+| `vllm` | vllm (compiled from source) | PagedAttention + Continuous Batching |
+| `sglang` | sglang (compiled from source) | RadixAttention + Chunk Prefill + FlashInfer |
+| `benchmark` | locust, llama-benchy, aiohttp, pandas, numpy, tqdm, transformers, matplotlib | Load testing + sweep sweeps + chart generation |
 | `litellm` | litellm[proxy]>=1.40.0, redis, redisvl | API gateway + semantic cache |
 | `monitoring` | prometheus-client, psutil, gputil | GPU & system metrics |
 
-**Note:** `vllm` and `sglang` groups conflict — cannot install both in the same environment.
+**Notes:**
+- `vllm` and `sglang` groups conflict — cannot install both in the same environment. The Harmony Docker image installs each in its own venv.
+- `benchmark` group requires `matplotlib` for cross-sweep chart generation (`scripts/visualize_cross_sweep.py`).
+- `common` group is always installed.

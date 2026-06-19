@@ -67,9 +67,10 @@ uv run python scripts/download-models.py --list
 |------|-------|--------|--------|---------|-------------|
 | qwen3-embedding | Embedding | 0.6B | GGUF | llama.cpp | ~0.5 GB |
 | qwen0.5b | P0 Ultra-Light | 0.5B | HF | vLLM | ~0.2 GB |
+| qwen0.5b-sglang | P0 Ultra-Light | 0.5B | HF | SGLang | ~0.2 GB |
 | qwen0.5b-gguf | P0 Ultra-Light | 0.5B | GGUF | llama.cpp | ~0.5 GB |
-| llama3.1-8b | P1 Light | 8B | HF | vLLM | ~3 GB |
 | qwen7b | P1 Light | 7B | HF | vLLM | ~3 GB |
+| qwen7b-sglang | P1 Light | 7B | HF | SGLang | ~3 GB |
 | qwen7b-gguf | P1 Light | 7B | GGUF | llama.cpp | ~4 GB |
 | qwen14b | P2 Medium | 14B | HF | vLLM | ~5 GB |
 | qwen14b-gguf | P2 Medium | 14B | GGUF | llama.cpp | ~8 GB |
@@ -80,4 +81,3 @@ uv run python scripts/download-models.py --list
 - HF models are full-precision (BF16/FP16) unless marked AWQ
 - GGUF models use Q4_K_M quantization
 - AWQ models use Int4 quantization (smaller, faster on vLLM)
-- `llama3.1-8b` requires Meta approval — run `hf auth login` first

@@ -57,7 +57,7 @@ docker build -f docker/Dockerfile.vllm-sglang-llama -t harmony-bench:cu129 .
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VLLM_VERSION` | `v0.20.1` | vLLM version (from Docker Hub) |
+| `VLLM_VERSION` | `v0.23.0` | vLLM version (from Docker Hub) |
 | `CUDA_VERSION` | `129` | CUDA version |
 | `CUDA_ARCH` | `8.6` | GPU compute capability |
 | `CMAKE_JOBS` | `8` | Parallel compile jobs for llama.cpp |

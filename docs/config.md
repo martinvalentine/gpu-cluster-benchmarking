@@ -46,7 +46,7 @@ models:
     enabled: true               # Set true to download/benchmark
     phase: p3                   # p0, p1, p2, p3, embedding
     backend: vllm               # vllm, llamacpp, sglang
-    proxy_name: qwen32b-vllm    # Model name for LiteLLM proxy
+    proxy_name: qwen32b-awq-vllm    # Model name for LiteLLM proxy
     endpoint: true              # Route through proxy
     # Per-model vLLM overrides (take precedence over cluster defaults)
     vllm_tp: 1
@@ -55,25 +55,7 @@ models:
     vllm_max_seqs: 256
 ```
 
-**Fields:**
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Unique identifier for `--only` filtering |
-| `repo_id` | Yes | HuggingFace repository ID |
-| `local_dir` | Yes | Destination path (relative to `base_dir`) |
-| `format` | No | `hf` (full repo) or `gguf` (specific files). Default: `hf` |
-| `include` | No | Glob pattern for GGUF files |
-| `exclude` | No | Glob pattern to skip files |
-| `enabled` | No | `true` to download/benchmark. Default: `true` |
-| `phase` | No | Benchmark phase: p0, p1, p2, p3, embedding |
-| `backend` | No | Server backend: vllm, llamacpp, sglang |
-| `proxy_name` | No | Model name for LiteLLM proxy routing |
-| `endpoint` | No | `true` to route through proxy |
-| `vllm_tp` | No | Tensor parallel size override |
-| `vllm_gpu_mem` | No | GPU memory utilization override |
-| `vllm_quant` | No | Quantization override (awq, gptq, none) |
-| `vllm_max_seqs` | No | Max concurrent sequences override |
+For the complete field reference (every `vllm_*` / `llamacpp_*` / `sglang_*` override, all model metadata fields, top-level keys, and ports), see [params.md](params.md).
 
 ### Port Configuration
 
@@ -129,7 +111,7 @@ All scripts source `.env` automatically if it exists (does not override existing
 
 **Individual scripts** require env vars when called standalone:
 
-### vLLM (`run-vllm.sh`, `bench-vllm.sh`)
+### vLLM (`run-vllm.sh`, `vllm_bench.sh`)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -154,7 +136,7 @@ All scripts source `.env` automatically if it exists (does not override existing
 | `LLAMA_CACHE_VAL` | No | `turbo4` | KV cache value type |
 | `LLAMA_FLASH_ATTN` | No | `on` | Flash Attention |
 
-### SGLang (`run-sglang.sh`, `bench-sglang.sh`)
+### SGLang (`run-sglang.sh`, `sglang_bench.sh`)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -163,7 +145,7 @@ All scripts source `.env` automatically if it exists (does not override existing
 | `SGLANG_QUANT` | No | `none` | Quantization |
 | `SGLANG_BENCH_URL` | No | `http://localhost:8002` | Server URL |
 
-### llama.cpp Benchmark (`bench-llamacpp.sh`)
+### llama.cpp Benchmark (`llamacpp_bench.sh`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|

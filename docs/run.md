@@ -2,6 +2,8 @@
 
 Each server runs in its own terminal/tmux session. Use `start-all-tmux.sh` to start all at once, or start individually.
 
+For the complete vLLM / llama.cpp / SGLang CLI flag reference, see [serving-frameworks-params.md](serving-frameworks-params.md). The tables in this doc cover the wrapper-script flags only.
+
 ## Quick Start
 
 ```bash
@@ -25,27 +27,16 @@ export VLLM_TP=1
 export VLLM_QUANT=awq
 ./scripts/run/run-vllm.sh
 
-# llama.cpp
-export LLAMA_MODEL=/workspace/models/gguf/qwen2.5-32b/qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf
+# llama.cpp (use a model that is actually on disk; qwen32b-gguf is currently disabled)
+export LLAMA_MODEL=/workspace/models/gguf/qwen2.5-7b/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
 ./scripts/run/run-llamacpp.sh
 
 # Benchmark
 export VLLM_BENCH_MODEL=/workspace/models/hf/qwen2.5-32b-awq
-./scripts/benchmark/bench-vllm.sh -p p3
+./scripts/benchmark/vllm_bench.sh --full
 ```
 
 Scripts fail with a clear error if required env vars are missing.
-
-## Port Reference
-
-| Service | Port | Script |
-|---------|------|--------|
-| vLLM | 8000 | `scripts/run/run-vllm.sh` |
-| llama-cpp-turboquant | 8001 | `scripts/run/run-llamacpp.sh` |
-| SGLang | 8002 | `scripts/run/run-sglang.sh` |
-| Embedding server | 8003 | `scripts/run/run-embedding-server.sh` |
-| LiteLLM proxy | 4000 | `scripts/run/run-proxy.sh` |
-| Redis | 6379 | `redis-server` |
 
 ## start-all-tmux.sh
 
@@ -96,7 +87,7 @@ uv run ./scripts/run/run-llamacpp.sh [MODEL_PATH]
 
 ```bash
 # Default (4 slots, 4K context, turbo4)
-uv run ./scripts/run/run-llamacpp.sh /workspace/models/gguf/qwen2.5-0.6b/qwen2.5-0.5b-instruct-q4_k_m.gguf
+uv run ./scripts/run/run-llamacpp.sh /workspace/models/gguf/qwen2.5-0.5b/qwen2.5-0.5b-instruct-q4_k_m.gguf
 
 # 8 slots, 32K context
 uv run ./scripts/run/run-llamacpp.sh -n 8 -c 32768 /path/to/model.gguf
@@ -140,7 +131,7 @@ uv run ./scripts/run/run-vllm.sh [MODEL_PATH]
 
 ```bash
 # 0.5B model (single GPU)
-uv run ./scripts/run/run-vllm.sh /workspace/models/hf/qwen2.5-0.6b
+uv run ./scripts/run/run-vllm.sh /workspace/models/hf/qwen2.5-0.5b
 
 # 32B AWQ model (single GPU)
 uv run ./scripts/run/run-vllm.sh -q awq -gmu 0.87 /workspace/models/hf/qwen2.5-32b-awq
@@ -151,6 +142,8 @@ uv run ./scripts/run/run-vllm.sh -gmu 0.90 -mns 128 /workspace/models/hf/qwen2.5
 # 6-GPU cluster with 32B
 uv run ./scripts/run/run-vllm.sh -tp 6 -gmu 0.87 -q awq /workspace/models/hf/qwen2.5-32b-awq
 ```
+
+For the full vLLM server flag reference, see [serving-frameworks-params.md](serving-frameworks-params.md).
 
 ## SGLang (port 8002)
 
