@@ -347,7 +347,7 @@ if [[ "$NATIVE" -eq 1 ]]; then
 
     start_gpu_monitor
 
-    local num_prompts=$((NATIVE_MAX_CONC * 4))
+    num_prompts=$((NATIVE_MAX_CONC * 4))
     if [[ "$num_prompts" -gt "$NATIVE_NUM_PROMPTS" ]]; then
         num_prompts="$NATIVE_NUM_PROMPTS"
     fi
