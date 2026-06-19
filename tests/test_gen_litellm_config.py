@@ -191,7 +191,68 @@ def test_dispatcher_routes_sglang(tmp_path, monkeypatch):
 
 
 # --- Tests T12–T14: generate_config integration ---
-# (added in task 10)
+
+
+# T12: disabled models are skipped
+def test_generate_config_skips_disabled_models(tmp_path):
+    config = {
+        "base_dir": str(tmp_path), "ports": {},
+        "models": [
+            {"name": "enabled", "backend": "vllm", "enabled": True,
+             "endpoint": True, "local_dir": "hf/a", "vllm_tp": 1},
+            {"name": "disabled", "backend": "vllm", "enabled": False,
+             "endpoint": True, "local_dir": "hf/b", "vllm_tp": 1},
+        ],
+    }
+    result, _ = glc.generate_config(config, Path("."), search_dirs=[], strict=False)
+    names = [m["model_name"] for m in result["model_list"]]
+    assert "enabled-vllm" in names
+    assert "disabled-vllm" not in names
+
+
+# T13: models with endpoint=False are skipped
+def test_generate_config_skips_non_endpoint_models(tmp_path):
+    config = {
+        "base_dir": str(tmp_path), "ports": {},
+        "models": [
+            {"name": "endpoint", "backend": "vllm", "enabled": True,
+             "endpoint": True, "local_dir": "hf/a", "vllm_tp": 1},
+            {"name": "no-endpoint", "backend": "vllm", "enabled": True,
+             "endpoint": False, "local_dir": "hf/b", "vllm_tp": 1},
+        ],
+    }
+    result, _ = glc.generate_config(config, Path("."), search_dirs=[], strict=False)
+    names = [m["model_name"] for m in result["model_list"]]
+    assert "endpoint-vllm" in names
+    assert "no-endpoint-vllm" not in names
+
+
+# T14: generate_config with valid config + models on disk produces full proxy config
+def test_generate_config_full_round_trip(tmp_path):
+    """End-to-end: build a small config with real files, check the output structure."""
+    # Create model dirs
+    vllm_dir = tmp_path / "models" / "hf" / "test-vllm"
+    vllm_dir.mkdir(parents=True)
+    llamacpp_dir = tmp_path / "models" / "gguf" / "test-gguf"
+    llamacpp_dir.mkdir(parents=True)
+    (llamacpp_dir / "model-q4_k_m.gguf").write_bytes(b"\x00")
+
+    config = {
+        "base_dir": str(tmp_path / "models"), "ports": {"vllm": 8000, "llamacpp": 8001},
+        "models": [
+            {"name": "test-vllm", "backend": "vllm", "enabled": True,
+             "endpoint": True, "local_dir": "hf/test-vllm", "proxy_name": "test-vllm-vllm",
+             "vllm_tp": 1},
+            {"name": "test-gguf", "backend": "llamacpp", "enabled": True,
+             "endpoint": True, "local_dir": "gguf/test-gguf", "proxy_name": "test-gguf-llamacpp",
+             "include": "*q4_k_m.gguf"},
+        ],
+    }
+    result, _ = glc.generate_config(config, Path("."), search_dirs=[], strict=False)
+    assert len(result["model_list"]) == 2
+    by_name = {m["model_name"]: m for m in result["model_list"]}
+    assert by_name["test-vllm-vllm"]["litellm_params"]["api_base"] == "http://localhost:8000/v1"
+    assert by_name["test-gguf-llamacpp"]["litellm_params"]["model"] == "openai/model-q4_k_m.gguf"
 
 
 # --- Tests T15–T21: main() error collection, summary, strict-mode ---

@@ -205,7 +205,7 @@ def generate_config(config: dict, project_root: Path, search_dirs, strict) -> tu
 
         backend = m.get("backend", "vllm")
         port = m.get("api_port", ports.get(backend, 8000))
-        proxy_name = m.get("proxy_name", m.get("name", "unknown"))
+        proxy_name = m.get("proxy_name") or f"{m.get('name', 'unknown')}-{backend}"
 
         # Soft warning: HF path missing in non-strict mode
         if backend in ("vllm", "sglang"):
