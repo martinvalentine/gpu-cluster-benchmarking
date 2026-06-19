@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "${SCRIPT_DIR}/write_params.sh"
 
 # Load .env if exists (does not override existing env vars)
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
@@ -90,6 +91,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 MODEL="${MODEL:-$DEFAULT_MODEL}"
+backend="vllm"
+write_params "$backend"
 if [[ -z "$MODEL" ]]; then
     echo "ERROR: No model specified. Set VLLM_MODEL env var or pass model path." >&2
     echo "Usage: $0 [OPTIONS] [MODEL_PATH]" >&2
