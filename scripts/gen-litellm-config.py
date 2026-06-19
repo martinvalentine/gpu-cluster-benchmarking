@@ -166,7 +166,7 @@ def resolve_model_path(model, search_dirs, strict):
     return resolve_hf_path(model, search_dirs, strict)
 
 
-def generate_config(config: dict, project_root: Path, search_dirs, strict) -> dict:
+def generate_config(config: dict, project_root: Path, search_dirs, strict) -> tuple[dict, list]:
     """Generate litellm_config.yaml content from models.yaml.
 
     search_dirs: list of directories to search for model files.
@@ -175,6 +175,9 @@ def generate_config(config: dict, project_root: Path, search_dirs, strict) -> di
     strict: if True, missing HF paths raise hard errors.
             If False, missing HF paths produce soft warnings (WARN tag
             in summary, model still included in output).
+
+    Returns (litellm_config, soft_warnings).
+    Hard errors abort the run via sys.exit(1) before returning.
     """
     ports = config.get("ports", {})
     base_dir = Path(config.get("base_dir", "models"))
@@ -200,15 +203,15 @@ def generate_config(config: dict, project_root: Path, search_dirs, strict) -> di
             hard_errors.append(str(e))
             continue
 
-        # Soft warning: HF path missing in non-strict mode
-        if m.get("backend") in ("vllm", "sglang"):
-            if not Path(model_id).exists():
-                soft_warnings.append((m.get("name", "unknown"),
-                                     f"{model_id} not found in {Path(model_id).parent}"))
-
         backend = m.get("backend", "vllm")
         port = m.get("api_port", ports.get(backend, 8000))
         proxy_name = m.get("proxy_name", m.get("name", "unknown"))
+
+        # Soft warning: HF path missing in non-strict mode
+        if backend in ("vllm", "sglang"):
+            if not Path(model_id).exists():
+                soft_warnings.append((proxy_name,
+                                     f"{model_id} not found in {Path(model_id).parent}"))
 
         model_list.append({
             "model_name": proxy_name,
@@ -226,27 +229,78 @@ def generate_config(config: dict, project_root: Path, search_dirs, strict) -> di
         print(f"\nAborted: {len(hard_errors)} hard error(s), 0 models written.", file=sys.stderr)
         sys.exit(1)
 
-    return {
-        "model_list": model_list,
-        "router_settings": {"routing_strategy": "least-busy"},
-        "litellm_settings": {
-            "set_verbose": False,
-            "num_retries": 2,
-            "request_timeout": 120,
-            "success_callback": ["prometheus"],
-            "failure_callback": ["prometheus"],
-            "cache": True,
-            "cache_params": {"type": "redis", "host": "localhost", "port": 6379, "ttl": 3600},
+    return (
+        {
+            "model_list": model_list,
+            "router_settings": {"routing_strategy": "least-busy"},
+            "litellm_settings": {
+                "set_verbose": False,
+                "num_retries": 2,
+                "request_timeout": 120,
+                "success_callback": ["prometheus"],
+                "failure_callback": ["prometheus"],
+                "cache": True,
+                "cache_params": {"type": "redis", "host": "localhost", "port": 6379, "ttl": 3600},
+            },
         },
-    }
+        soft_warnings,
+    )
 
 
-def print_summary(litellm_config, config, project_root, args, file=None):
-    """Placeholder; real implementation in Task 9."""
+def print_summary(litellm_config, config, project_root, args, file=None, soft_warnings=None):
+    """Print summary table to stderr with OK/WARN tagging.
+
+    Tags:
+      OK   - all checks passed
+      WARN - soft warning (HF path missing in non-strict mode)
+
+    Hard errors abort the run before this function is called.
+    """
     if file is None:
         file = sys.stdout
-    model_count = len(litellm_config.get("model_list", []))
-    print(f"\n  Generated LiteLLM config ({model_count} models)", file=file)
+
+    # Build a lookup of soft warnings by model_name
+    soft_lookup: dict[str, str] = {}
+    if soft_warnings:
+        for name, msg in soft_warnings:
+            soft_lookup[name] = msg
+
+    model_list = litellm_config.get("model_list", [])
+    warn_count = 0
+    lines = [
+        "",
+        f"  Generated LiteLLM config",
+        f"    Output     {args.output if not getattr(args, 'preview', False) else '(preview, stdout)'}",
+        f"    Models     {len(model_list)} endpoint(s)",
+    ]
+    if warn_count:
+        lines.append(f"    Warnings   {warn_count}")
+    lines.append("")
+
+    for entry in model_list:
+        proxy_name = entry["model_name"]
+        params = entry["litellm_params"]
+        model_id = params["model"]
+        api_base = params["api_base"]
+        # Check if this proxy_name corresponds to a warned model
+        warn_msg = soft_lookup.get(proxy_name)
+        if warn_msg:
+            tag = "WARN "
+            warn_count += 1
+        else:
+            tag = "OK   "
+        lines.append(f"  {tag} {proxy_name:<25} → {model_id} @ {api_base}")
+        if warn_msg:
+            lines.append(f"        ({warn_msg})")
+
+    if warn_count:
+        lines += ["", "  Warnings:"]
+        for entry in model_list:
+            msg = soft_lookup.get(entry["model_name"])
+            if msg:
+                lines.append(f"    {entry['model_name']}: {msg}")
+
+    print("\n".join(lines), file=file)
 
 
 def main(args=None):
@@ -300,15 +354,20 @@ def main(args=None):
         sys.exit(1)
 
     config = load_config(args.config)
-    litellm_config = generate_config(config, project_root, search_dirs=cli_base_dirs, strict=strict)
+    litellm_config, soft_warnings = generate_config(
+        config, project_root, search_dirs=cli_base_dirs, strict=strict,
+    )
 
     output = yaml.dump(litellm_config, default_flow_style=False, sort_keys=False, allow_unicode=True)
     if args.preview:
         print(output)
-        sys.exit(0)
-    args.output = project_root / args.output
-    args.output.write_text(output)
-    print_summary(litellm_config, config, project_root, args, file=sys.stderr)
+    else:
+        args.output = project_root / args.output
+        args.output.write_text(output)
+    print_summary(
+        litellm_config, config, project_root, args,
+        file=sys.stderr, soft_warnings=soft_warnings,
+    )
 
 
 if __name__ == "__main__":

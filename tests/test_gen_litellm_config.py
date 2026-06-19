@@ -227,6 +227,104 @@ def test_resolve_with_empty_search_dirs_strict(tmp_path):
         glc.resolve_model_path(model, [], strict=True)
 
 
+# T15: main() with --preview and a hard error exits 1 with nothing on stdout
+def test_main_preview_hard_error_exits_1_no_stdout(tmp_path, capsys):
+    """--preview + hard error → exit 1, stdout empty (YAML not printed)."""
+    config_path = tmp_path / "config.yaml"
+    # A llamacpp model with no files anywhere → UnresolvableFilename
+    config_path.write_text(yaml.dump({
+        "base_dir": str(tmp_path / "models"),
+        "ports": {},
+        "models": [
+            {"name": "broken", "backend": "llamacpp", "enabled": True,
+             "endpoint": True, "local_dir": "gguf/missing", "include": "*q4_k_m.gguf",
+             "phase": "p0"},
+        ],
+    }))
+    with pytest.raises(SystemExit) as exc_info:
+        glc.main(["--config", str(config_path), "--preview"])
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""  # stdout is empty (no YAML printed on hard error)
+
+
+# T17: main() with soft warning exits 0, output written, warning on stderr
+def test_main_soft_warning_exits_0_with_output(tmp_path, capsys):
+    """HF path missing in non-strict mode → exit 0, output written, WARN in stderr."""
+    # Use the real config but override base_dir to a path that doesn't have HF dirs
+    config_path = tmp_path / "config.yaml"
+    hf_root = tmp_path / "hf_root"  # exists, but subdirs don't
+    hf_root.mkdir()
+    config_path.write_text(yaml.dump({
+        "base_dir": str(hf_root),
+        "ports": {"vllm": 8000},
+        "models": [
+            {"name": "test-vllm", "backend": "vllm", "enabled": True,
+             "endpoint": True, "local_dir": "hf/missing", "proxy_name": "test-vllm-vllm",
+             "vllm_tp": 1},
+        ],
+    }))
+    glc.main(["--config", str(config_path), "--output", str(tmp_path / "out.yaml")])
+    captured = capsys.readouterr()
+    assert (tmp_path / "out.yaml").exists()  # output was written
+    assert "WARN" in captured.err
+    assert "test-vllm-vllm" in captured.err
+
+
+# T18: main() with --preview keeps stdout clean (pipeable)
+def test_main_preview_keeps_stdout_clean_for_piping(tmp_path, capsys):
+    """--preview → stdout is pure YAML, summary goes to stderr."""
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump({
+        "base_dir": str(tmp_path / "models"),
+        "ports": {},
+        "models": [],  # no models → no errors, just empty output
+    }))
+    glc.main(["--config", str(config_path), "--preview"])
+    captured = capsys.readouterr()
+    # stdout: pure YAML, starts with model_list: (or similar YAML structure)
+    assert "model_list" in captured.out or captured.out.strip() == ""  # valid YAML or empty
+    # stderr: contains the summary
+    assert "Generated LiteLLM config" in captured.err
+
+
+# T21: Two models with different failure types in one run → both errors printed
+def test_main_collects_all_hard_errors_no_early_exit(tmp_path, capsys):
+    """Both errors reach stderr before exit 1; output is not written."""
+    config_path = tmp_path / "config.yaml"
+    # Model A: llamacpp, no files anywhere → UnresolvableFilename
+    # Model B: llamacpp, multiple files in dir → AmbiguousFilename
+    config_path.write_text(yaml.dump({
+        "base_dir": str(tmp_path / "models"),
+        "ports": {},
+        "models": [
+            {"name": "modelA", "backend": "llamacpp", "enabled": True,
+             "endpoint": True, "local_dir": "gguf/modelA", "include": "*q4_k_m.gguf",
+             "phase": "p0"},
+            {"name": "modelB", "backend": "llamacpp", "enabled": True,
+             "endpoint": True, "local_dir": "gguf/modelB", "include": "*q4_k_m.gguf",
+             "phase": "p0"},
+        ],
+    }))
+    # Set up modelB dir with 2 .gguf files (triggers AmbiguousFilename)
+    modelB_dir = tmp_path / "models" / "gguf" / "modelB"
+    modelB_dir.mkdir(parents=True)
+    (modelB_dir / "model-q4_k_m.gguf").write_bytes(b"\x00")
+    (modelB_dir / "model-q8_0.gguf").write_bytes(b"\x00")
+    # modelA dir doesn't exist → UnresolvableFilename
+
+    with pytest.raises(SystemExit) as exc_info:
+        glc.main(["--config", str(config_path), "--preview"])
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""  # nothing on stdout
+    # Both errors should be in stderr
+    assert "modelA" in captured.err
+    assert "modelB" in captured.err
+    assert "Aborted" in captured.err
+    assert "2 hard error" in captured.err
+
+
 # (added in tasks 8, 9, 10)
 
 
