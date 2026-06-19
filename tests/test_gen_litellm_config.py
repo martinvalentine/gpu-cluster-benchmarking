@@ -423,4 +423,53 @@ def test_summary_marks_hf_missing_as_warn(capsys):
 
 
 # --- Test T22: end-to-end regression ---
-# (added in task 11)
+
+
+# T22: end-to-end regression — script output matches the committed litellm_config.yaml
+@pytest.mark.skipif(
+    not (REPO_MODELS_DIR / "gguf").exists(),
+    reason=T22_SKIP_REASON,
+)
+def test_t22_generated_matches_hand_edited(tmp_path, capsys):
+    """Run main() with the real config + real model files.
+    Compare generated YAML to the committed litellm_config.yaml.
+    Semantic equivalence: same model_names, same api_base, same model per name.
+    """
+    config_path = Path("configs/models.yaml")
+    committed = Path("litellm_config.yaml")
+
+    # Load the real config, override base_dir to the host path
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    config["base_dir"] = str(REPO_MODELS_DIR)
+
+    # Write a temp config with the overridden base_dir
+    temp_config = tmp_path / "models.yaml"
+    temp_config.write_text(yaml.dump(config))
+
+    # Generate to a temp output file
+    temp_output = tmp_path / "litellm_config.yaml"
+    glc.main(["--config", str(temp_config), "--output", str(temp_output)])
+
+    # Load both YAML files
+    with open(temp_output) as f:
+        generated = yaml.safe_load(f)
+    with open(committed) as f:
+        hand_edited = yaml.safe_load(f)
+
+    # Compare semantically
+    gen_by_name = {m["model_name"]: m for m in generated["model_list"]}
+    hand_by_name = {m["model_name"]: m for m in hand_edited["model_list"]}
+
+    assert set(gen_by_name.keys()) == set(hand_by_name.keys()), (
+        f"model_name set mismatch: "
+        f"only in generated={set(gen_by_name) - set(hand_by_name)}, "
+        f"only in hand_edited={set(hand_by_name) - set(gen_by_name)}"
+    )
+
+    for name in gen_by_name:
+        g = gen_by_name[name]["litellm_params"]
+        h = hand_by_name[name]["litellm_params"]
+        assert g["api_base"] == h["api_base"], f"{name}: api_base mismatch"
+        assert g["model"] == h["model"], f"{name}: model mismatch"
+        assert g["api_key"] == h["api_key"], f"{name}: api_key mismatch"
