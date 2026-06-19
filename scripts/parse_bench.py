@@ -210,26 +210,62 @@ def parse_llama_benchy_json(data: dict, filename: str = "", params: dict | None 
 def parse_sglang_jsonl(line: str) -> dict | None:
     try:
         data = json.loads(line)
-        return {
-            "successful_requests": 1,
-            "failed_requests": 0 if data.get("error") is None else 1,
-            "duration_s": round(data.get("latency", 0), 2),
-            "req_throughput": 0,
-            "output_tok_s": round(data.get("throughput", 0), 2),
-            "total_tok_s": 0,
-            "tok_s_per_req": 0,
-            "mean_ttft_ms": round(data.get("ttft", 0) * 1000, 2) if data.get("ttft") else 0,
-            "median_ttft_ms": 0,
-            "p99_ttft_ms": 0,
-            "mean_tpot_ms": round(data.get("tpot", 0) * 1000, 2) if data.get("tpot") else 0,
-            "p99_tpot_ms": 0,
-            "mean_itl_ms": round(data.get("itl", 0) * 1000, 2) if data.get("itl") else 0,
-            "p99_itl_ms": 0,
-            "total_input_tokens": data.get("prompt_tokens", 0),
-            "total_generated_tokens": data.get("completion_tokens", 0),
-        }
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, ValueError):
         return None
+
+    if data.get("error") is not None:
+        return {
+            "successful_requests": 0,
+            "failed_requests": 1,
+            "duration_s": 0, "req_throughput": 0,
+            "output_tok_s": 0, "total_tok_s": 0, "tok_s_per_req": 0,
+            "mean_ttft_ms": 0, "median_ttft_ms": 0, "p99_ttft_ms": 0,
+            "mean_tpot_ms": 0, "p99_tpot_ms": 0,
+            "mean_itl_ms": 0, "p99_itl_ms": 0,
+            "total_input_tokens": 0, "total_generated_tokens": 0,
+        }
+
+    if "completed" in data and "total_output_tokens" in data:
+        # sglang.bench_serving native format — values already in ms, durations in s
+        duration = data.get("duration", 0)
+        completed = data.get("completed", 0)
+        return {
+            "successful_requests": completed,
+            "failed_requests": 0,
+            "duration_s": round(duration, 2),
+            "req_throughput": round(data.get("request_throughput", 0), 3),
+            "output_tok_s": round(data.get("output_throughput", 0), 2),
+            "total_tok_s": round(data.get("total_throughput", 0), 2),
+            "tok_s_per_req": 0,
+            "mean_ttft_ms": round(data.get("mean_ttft_ms", 0), 2),
+            "median_ttft_ms": round(data.get("median_ttft_ms", 0), 2),
+            "p99_ttft_ms": round(data.get("p99_ttft_ms", 0), 2),
+            "mean_tpot_ms": round(data.get("mean_tpot_ms", 0), 2),
+            "p99_tpot_ms": round(data.get("p99_tpot_ms", 0), 2),
+            "mean_itl_ms": round(data.get("mean_itl_ms", 0), 2),
+            "p99_itl_ms": round(data.get("p99_itl_ms", 0), 2),
+            "total_input_tokens": data.get("total_input_tokens", 0),
+            "total_generated_tokens": data.get("total_output_tokens", 0),
+        }
+
+    return {
+        "successful_requests": 1,
+        "failed_requests": 0,
+        "duration_s": round(data.get("latency", 0), 2),
+        "req_throughput": 0,
+        "output_tok_s": round(data.get("throughput", 0), 2),
+        "total_tok_s": 0,
+        "tok_s_per_req": 0,
+        "mean_ttft_ms": round(data.get("ttft", 0) * 1000, 2) if data.get("ttft") else 0,
+        "median_ttft_ms": 0,
+        "p99_ttft_ms": 0,
+        "mean_tpot_ms": round(data.get("tpot", 0) * 1000, 2) if data.get("tpot") else 0,
+        "p99_tpot_ms": 0,
+        "mean_itl_ms": round(data.get("itl", 0) * 1000, 2) if data.get("itl") else 0,
+        "p99_itl_ms": 0,
+        "total_input_tokens": data.get("prompt_tokens", 0),
+        "total_generated_tokens": data.get("completion_tokens", 0),
+    }
 
 
 def parse_llamacpp_tsv_dir(tsv_dir: Path, model: str, phase: str) -> list[dict]:
@@ -357,39 +393,61 @@ def collect_results(results_dir: Path) -> list[dict]:
         phase = detect_phase(jsonl_file)
         run_name = detect_run_dir(jsonl_file)
         model = model_map.get(run_name, run_name)
+        if model == run_name:
+            try:
+                first_data = next(
+                    (json.loads(ln) for ln in jsonl_file.read_text().strip().split("\n") if ln.strip()),
+                    None,
+                )
+                if first_data and first_data.get("server_info", {}).get("served_model_name"):
+                    model = first_data["server_info"]["served_model_name"]
+            except (json.JSONDecodeError, OSError):
+                pass
         conc = extract_concurrency(jsonl_file.name)
 
         agg = {"succ": 0, "fail": 0, "ttfts": [], "tpots": [], "itls": [], "inp": 0, "out": 0}
+        is_native_format = False
+        native_metrics: dict = {}
         try:
             for line in jsonl_file.read_text().strip().split("\n"):
                 if not line.strip(): continue
                 result = parse_sglang_jsonl(line)
-                if result:
-                    agg["succ"] += result["successful_requests"]
-                    agg["fail"] += result["failed_requests"]
-                    agg["inp"] += result["total_input_tokens"]
-                    agg["out"] += result["total_generated_tokens"]
-                    if result["mean_ttft_ms"] > 0: agg["ttfts"].append(result["mean_ttft_ms"])
-                    if result["mean_tpot_ms"] > 0: agg["tpots"].append(result["mean_tpot_ms"])
-                    if result["mean_itl_ms"] > 0: agg["itls"].append(result["mean_itl_ms"])
+                if result is None:
+                    continue
+                try:
+                    raw = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    raw = {}
+                if "total_throughput" in raw or "total_output_tokens" in raw:
+                    is_native_format = True
+                    native_metrics = result
+                    break
+                agg["succ"] += result["successful_requests"]
+                agg["fail"] += result["failed_requests"]
+                agg["inp"] += result["total_input_tokens"]
+                agg["out"] += result["total_generated_tokens"]
+                if result["mean_ttft_ms"] > 0: agg["ttfts"].append(result["mean_ttft_ms"])
+                if result["mean_tpot_ms"] > 0: agg["tpots"].append(result["mean_tpot_ms"])
+                if result["mean_itl_ms"] > 0: agg["itls"].append(result["mean_itl_ms"])
         except OSError as e:
             print(f"  WARN: {jsonl_file}: {e}", file=sys.stderr); continue
 
-        # Load params from sibling params.json (sglang JSONL doesn't embed params in the result file itself)
         sglang_params = _load_params_from_dir(jsonl_file.parent)
         flat_params = _flatten_params(sglang_params)
 
-        def avg(lst): return round(sum(lst) / len(lst), 2) if lst else 0
-
-        m = empty_metrics()
-        m.update({
-            "successful_requests": agg["succ"], "failed_requests": agg["fail"],
-            "mean_ttft_ms": avg(agg["ttfts"]), "mean_tpot_ms": avg(agg["tpots"]),
-            "mean_itl_ms": avg(agg["itls"]),
-            "total_input_tokens": agg["inp"], "total_generated_tokens": agg["out"],
-        })
+        if is_native_format:
+            row_metrics = native_metrics
+        else:
+            def avg(lst): return round(sum(lst) / len(lst), 2) if lst else 0
+            row_metrics = empty_metrics()
+            row_metrics.update({
+                "successful_requests": agg["succ"], "failed_requests": agg["fail"],
+                "mean_ttft_ms": avg(agg["ttfts"]), "mean_tpot_ms": avg(agg["tpots"]),
+                "mean_itl_ms": avg(agg["itls"]),
+                "total_input_tokens": agg["inp"], "total_generated_tokens": agg["out"],
+            })
         rows.append({"model": model, "backend": backend, "phase": phase, "pp": 0,
-                      "concurrency": conc, "file": jsonl_file.name, **m, **flat_params})
+                      "concurrency": conc, "file": jsonl_file.name, **row_metrics, **flat_params})
 
     # ── TSV files (llama.cpp) ────────────────────────────────
     processed_dirs = set()
