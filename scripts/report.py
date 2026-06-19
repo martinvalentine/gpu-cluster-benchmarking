@@ -2,7 +2,7 @@
 """Generate a formatted benchmark report from results.
 
 Full formatted report (terminal + CSV + markdown). For lightweight CSV
-aggregation used by the pipeline, see parse-results.py.
+aggregation used by the pipeline, see parse_bench.py.
 
 Reads JSON/TSV files from results/ and produces:
   - Terminal output (colored)
@@ -165,11 +165,43 @@ def parse_llamacpp_tsv(path):
         return None
 
 
+def parse_llama_benchy_json(path):
+    try:
+        data = json.loads(path.read_text())
+        results = data.get("results", [])
+        if not results:
+            return None
+
+        best = max(results, key=lambda r: r.get("total_throughput", 0))
+        return {
+            "framework": "llama-benchy",
+            "file": path.name,
+            "successful": len(results),
+            "failed": 0,
+            "duration_s": round(best.get("latency", 0), 2),
+            "req_throughput": 0,
+            "output_tok_s": round(best.get("generation_throughput", 0), 2),
+            "total_tok_s": round(best.get("total_throughput", 0), 2),
+            "mean_ttft": round(best.get("ttft", 0) * 1000, 2),
+            "median_ttft": 0,
+            "p99_ttft": 0,
+            "mean_tpot": 0,
+            "p99_tpot": 0,
+            "mean_itl": round(best.get("itl", 0) * 1000, 2),
+            "p99_itl": 0,
+        }
+    except Exception:
+        return None
+
+
 def collect_results(results_dir):
     results = []
 
     for f in sorted(results_dir.rglob("*.json")):
-        if f.name == "benchmark_summary.csv":
+        if f.name == "ccu_sweep.json" or f.name.startswith("prompt_sweep_pp"):
+            r = parse_llama_benchy_json(f)
+            if r:
+                results.append(r)
             continue
         r = parse_vllm_json(f)
         if r:

@@ -8,7 +8,7 @@ per-request latency metrics. Supports a configurable ratio of repeated prompts
 Usage:
     python bench-litellm-async.py
     python bench-litellm-async.py --concurrency 32 --num-requests 200
-    python bench-litellm-async.py --base-url http://gpu-pod:4000 --model qwen32b-sglang
+    python bench-litellm-async.py --base-url http://gpu-pod:4000 --model qwen7b-sglang
 """
 
 import argparse

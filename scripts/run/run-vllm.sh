@@ -43,7 +43,7 @@ ENV OVERRIDES:
   VLLM_MAX_MODEL_LEN, VLLM_MAX_NUM_SEQS, VLLM_QUANT
 
 EXAMPLES:
-  $(basename "$0")                                              # Defaults (qwen2.5-0.6b, TP=1)
+  $(basename "$0")                                              # Defaults (qwen2.5-0.5b, TP=1)
   $(basename "$0") -gmu 0.87 /workspace/models/hf/llama3.1-8b  # Single GPU, 8B
   $(basename "$0") -tp 6 -q awq                                # 6-GPU AWQ
   $(basename "$0") --no-prefix-cache --no-chunked-prefill       # Baseline (no cache)
@@ -151,4 +151,5 @@ exec vllm serve "$MODEL" \
     --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
     --block-size "$BLOCK_SIZE" \
     --dtype "$DTYPE" \
-    $TRUST_REMOTE
+    $TRUST_REMOTE \
+    ${SWAP_SPACE:+--swap-space "$SWAP_SPACE"}

@@ -9,7 +9,7 @@ if [[ -f "${PROJECT_ROOT}/.env" ]]; then
     set -a; source "${PROJECT_ROOT}/.env"; set +a
 fi
 
-DEFAULT_MODEL="${VLLM_MODEL:-}"
+DEFAULT_MODEL="${SGLANG_MODEL:-}"
 
 usage() {
     cat <<EOF
@@ -41,7 +41,7 @@ ENV OVERRIDES:
   SGLANG_MAX_TOTAL_TOKENS, SGLANG_QUANT
 
 EXAMPLES:
-  $(basename "$0")                                              # Defaults (qwen2.5-0.6b, TP=1)
+  $(basename "$0")                                              # Defaults (qwen2.5-0.5b, TP=1)
   $(basename "$0") -tp 1 models/hf/llama3.1-8b                 # Single GPU, 8B
   $(basename "$0") -p 8002 -tp 6 -q awq                        # AWQ quantization
   $(basename "$0") --disable-radix-cache                        # Baseline (no cache)
@@ -135,7 +135,7 @@ exec python3 -m sglang.launch_server \
     --model-path "$MODEL" \
     --host "$HOST" \
     --port "$PORT" \
-    --tp "$TP" \
+    --tp-size "$TP" \
     --mem-fraction-static "$MEM_FRAC" \
     --max-total-tokens "$MAX_TOTAL_TOKENS" \
     --chunked-prefill-size "$CHUNKED_PS" \

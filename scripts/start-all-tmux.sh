@@ -108,6 +108,7 @@ for m in models:
 
 if vllm_path:
     print(f"VLLM_MODEL={vllm_path}")
+    print(f"SGLANG_MODEL={vllm_path}")
     print(f"VLLM_TP={vllm_tp}")
     print(f"VLLM_GPU_MEM={vllm_gpu_mem}")
     print(f"VLLM_MAX_SEQS={vllm_max_num_seqs}")
@@ -133,6 +134,7 @@ PYEOF
     while IFS='=' read -r key val; do
         case "$key" in
             VLLM_MODEL)          VLLM_MODEL="$val" ;;
+            SGLANG_MODEL)        SGLANG_MODEL="$val" ;;
             VLLM_TP)             VLLM_TP="$val" ;;
             VLLM_GPU_MEM)        VLLM_GPU_MEM="$val" ;;
             VLLM_MAX_SEQS)       VLLM_MAX_NUM_SEQS="$val" ;;
@@ -157,6 +159,7 @@ PYEOF
 resolve_model_paths
 
 VLLM_MODEL="${VLLM_MODEL:-}"
+SGLANG_MODEL="${SGLANG_MODEL:-}"
 LLAMA_MODEL="${LLAMA_MODEL:-}"
 EMBED_MODEL="${EMBED_MODEL:-}"
 
@@ -167,6 +170,7 @@ MAX_NUM_SEQS=${VLLM_MAX_NUM_SEQS:-512}
 MAX_BATCHED_TOKENS=${MAX_BATCHED_TOKENS:-16384}
 BLOCK_SIZE=${BLOCK_SIZE:-16}
 DTYPE=${DTYPE:-auto}
+VLLM_QUANT=${VLLM_QUANT:-}
 LLAMA_NP=${LLAMA_NP:-8}
 LLAMA_CTX=${LLAMA_CTX:-8192}
 LLAMA_BATCH=${LLAMA_BATCH:-4096}
@@ -223,6 +227,7 @@ check_model() {
 }
 
 check_model "$VLLM_MODEL"  "vLLM model (HF)"
+check_model "$SGLANG_MODEL" "SGLang model (HF)"
 check_model "$LLAMA_MODEL" "llama.cpp model (GGUF)"
 check_model "$EMBED_MODEL" "Embedding model (GGUF)"
 
@@ -262,6 +267,7 @@ tmux new-session -d -s "$SESSION" -n "vllm" \
     "cd $PROJECT_ROOT && vllm serve $VLLM_MODEL \
         --host 0.0.0.0 --port 8000 \
         --tensor-parallel-size $TP \
+        ${VLLM_QUANT:+--quantization "$VLLM_QUANT"} \
         --gpu-memory-utilization $GPU_MEM_UTIL \
         --max-model-len $MAX_MODEL_LEN \
         --max-num-seqs $MAX_NUM_SEQS \
@@ -281,6 +287,18 @@ tmux new-window -t "$SESSION" -n "llama" \
         $LLAMA_MODEL 2>&1 | tee /tmp/llama.log; sleep infinity"
 ok "llama.cpp window created (port 8001)"
 
+tmux new-window -t "$SESSION" -n "sglang" \
+    "cd $PROJECT_ROOT && python3 -m sglang.launch_server \
+        --model \"$SGLANG_MODEL\" \
+        --port 8002 --host 0.0.0.0 \
+        --mem-fraction-static 0.85 \
+        --context-length 32768 \
+        --max-running-requests 2048 \
+        --trust-remote-code \
+        --disable-radix-cache \
+        --tp-size 1 2>&1 | tee /tmp/sglang.log; sleep infinity"
+ok "SGLang window created (port 8002)"
+
 tmux new-window -t "$SESSION" -n "embed" \
     "cd $PROJECT_ROOT && bash scripts/run/run-embedding-server.sh \
         -p 8003 -ng all -c 4096 -np last -ccu 4 \
@@ -299,13 +317,14 @@ echo ""
 echo -e "  ${DIM}Windows:${NC}"
 echo -e "  ${CYAN}0: vllm${NC}     → http://localhost:8000"
 echo -e "  ${CYAN}1: llama${NC}    → http://localhost:8001"
-echo -e "  ${CYAN}2: embed${NC}    → http://localhost:8003"
-echo -e "  ${CYAN}3: proxy${NC}    → http://localhost:4000"
+echo -e "  ${CYAN}2: sglang${NC}   → http://localhost:8002"
+echo -e "  ${CYAN}3: embed${NC}    → http://localhost:8003"
+echo -e "  ${CYAN}4: proxy${NC}    → http://localhost:4000"
 echo ""
 echo -e "  ${DIM}Attach:    tmux attach -t $SESSION${NC}"
-echo -e "  ${DIM}Switch:    Ctrl-b + 0/1/2/3${NC}"
+echo -e "  ${DIM}Switch:    Ctrl-b + 0/1/2/3/4${NC}"
 echo -e "  ${DIM}Detach:    Ctrl-b + d${NC}"
-echo -e "  ${DIM}Logs:      /tmp/vllm.log, /tmp/llama.log, /tmp/embed.log, /tmp/proxy.log${NC}"
+echo -e "  ${DIM}Logs:      /tmp/vllm.log, /tmp/llama.log, /tmp/sglang.log, /tmp/embed.log, /tmp/proxy.log${NC}"
 echo ""
 echo -e "  ${DIM}Wait ~15s for all services, then run:${NC}"
 echo -e "  ${CYAN}./scripts/test-all.sh${NC}"

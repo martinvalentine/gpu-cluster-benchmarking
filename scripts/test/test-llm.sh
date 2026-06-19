@@ -56,7 +56,7 @@ declare -A SERVERS=(
     [vllm]="http://localhost:8000"
     [llamacpp]="http://localhost:8001"
     [sglang]="http://localhost:8002"
-    [llamacpp-turbo]="http://localhost:8003"
+    [llamacpp-turbo]="http://localhost:8001"
 )
 
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; }

@@ -33,7 +33,7 @@ proxy stack: Gateway -> Cache -> Serving Engine.
 
 OPTIONS:
   -u, --url URL           LiteLLM proxy URL (default: http://localhost:4000)
-  -m, --model NAME        Model name as declared in litellm_config.yaml (default: qwen32b-vllm)
+  -m, --model NAME        Model name as declared in litellm_config.yaml (default: qwen0.5b-llamacpp)
   -o, --output DIR        Results directory (default: ./results/litellm)
   -M, --method METHOD     Benchmark method: async, locust (default: async)
   -c, --concurrency N     Max concurrent requests for async method (default: 10)
@@ -59,7 +59,7 @@ EXAMPLES:
   $(basename "$0")                                    # Defaults (async, 10 concurrent)
   $(basename "$0") -M locust --users 100 --run-time 10m
   $(basename "$0") -c 32 -n 200 --cache-ratio 80     # Heavy cache test
-  $(basename "$0") -u http://gpu-pod:4000 -m qwen32b-sglang
+  $(basename "$0") -u http://gpu-pod:4000 -m qwen7b-sglang
 EOF
     exit 0
 }

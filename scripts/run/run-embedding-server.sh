@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-BINARY="${LLAMA_EMBED_BINARY:-third_party/llama-cpp-turboquant/build/bin/llama-server}"
+BINARY="${LLAMA_EMBED_BINARY:-${PROJECT_ROOT}/third_party/llama-cpp-turboquant/build/bin/llama-server}"
 DEFAULT_MODEL="${LLAMA_EMBED_MODEL:-}"
 
 usage() {
@@ -18,7 +18,7 @@ POSITIONAL:
   MODEL_PATH              Path to GGUF embedding model (default: $DEFAULT_MODEL)
 
 OPTIONS:
-  -p, --port PORT         Server port (default: 12101)
+  -p, --port PORT         Server port (default: 8003)
   -H, --host HOST         Bind host (default: 0.0.0.0)
   -ng, --gpu-layers N     GPU layers (default: 999 = all)
   -c, --context N         Context size (default: 32768)

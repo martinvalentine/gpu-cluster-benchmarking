@@ -18,6 +18,7 @@ OPTIONS:
   -o, --output DIR        Results root directory (default: ./results)
   -f, --framework FW      Run specific framework: vllm, sglang, llamacpp, litellm, all (default: all)
   -p, --phase PHASE       Run specific phase: p1, p2, p3, all (default: all)
+  --use-llama-benchy      Use new llama-benchy based scripts instead of native benchmark tools
   --skip-health-check     Skip pre-flight health checks
   -y, --yes               Auto-accept prompts (for CI / non-interactive use)
   -h, --help              Show this help
@@ -26,6 +27,7 @@ EXAMPLES:
   $(basename "$0")                                    # Everything
   $(basename "$0") -f vllm -p p1                     # vLLM P1 only
   $(basename "$0") -f sglang -f llamacpp              # SGLang + llama.cpp
+  $(basename "$0") --use-llama-benchy                 # Use llama-benchy for all
   $(basename "$0") --skip-health-check                # Skip connectivity checks
 EOF
     exit 0
@@ -35,12 +37,14 @@ FRAMEWORK="all"
 PHASE="all"
 SKIP_HEALTH=0
 AUTO_YES=0
+USE_LLAMA_BENCHY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -o|--output)            RESULTS_DIR="$2"; shift 2 ;;
         -f|--framework)         FRAMEWORK="$2"; shift 2 ;;
         -p|--phase)             PHASE="$2"; shift 2 ;;
+        --use-llama-benchy)     USE_LLAMA_BENCHY=1; shift ;;
         --skip-health-check)    SKIP_HEALTH=1; shift ;;
         -y|--yes)               AUTO_YES=1; shift ;;
         -h|--help)              usage ;;
@@ -106,31 +110,39 @@ fi
 
 log "Benchmark run started: framework=$FRAMEWORK phase=$PHASE"
 
-# ── vLLM ─────────────────────────────────────────────────────────
 if [[ "$FRAMEWORK" == "all" || "$FRAMEWORK" == "vllm" ]]; then
     header "vLLM Benchmarks"
-    VLLM_RESULTS_DIR="$RESULTS_DIR/vllm" \
-    "${PROJECT_ROOT}/scripts/benchmark/bench-vllm.sh" -p "$PHASE" \
-        2>&1 | tee -a "$LOG_FILE"
+    if [[ "$USE_LLAMA_BENCHY" -eq 1 ]]; then
+        "${PROJECT_ROOT}/scripts/benchmark/bench.sh" -b vllm \
+            2>&1 | tee -a "$LOG_FILE"
+    else
+        "${PROJECT_ROOT}/scripts/benchmark/vllm_bench.sh" -o "$RESULTS_DIR/vllm" \
+            2>&1 | tee -a "$LOG_FILE"
+    fi
 fi
 
-# ── SGLang ────────────────────────────────────────────────────────
 if [[ "$FRAMEWORK" == "all" || "$FRAMEWORK" == "sglang" ]]; then
     header "SGLang Benchmarks"
-    SGLANG_RESULTS_DIR="$RESULTS_DIR/sglang" \
-    "${PROJECT_ROOT}/scripts/benchmark/bench-sglang.sh" -p "$PHASE" \
-        2>&1 | tee -a "$LOG_FILE"
+    if [[ "$USE_LLAMA_BENCHY" -eq 1 ]]; then
+        "${PROJECT_ROOT}/scripts/benchmark/bench.sh" -b sglang \
+            2>&1 | tee -a "$LOG_FILE"
+    else
+        "${PROJECT_ROOT}/scripts/benchmark/sglang_bench.sh" -o "$RESULTS_DIR/sglang" \
+            2>&1 | tee -a "$LOG_FILE"
+    fi
 fi
 
-# ── llama.cpp ─────────────────────────────────────────────────────
 if [[ "$FRAMEWORK" == "all" || "$FRAMEWORK" == "llamacpp" ]]; then
     header "llama.cpp Benchmarks"
-    LLAMA_RESULTS_DIR="$RESULTS_DIR/llamacpp" \
-    "${PROJECT_ROOT}/scripts/benchmark/bench-llamacpp.sh" \
-        2>&1 | tee -a "$LOG_FILE"
+    if [[ "$USE_LLAMA_BENCHY" -eq 1 ]]; then
+        "${PROJECT_ROOT}/scripts/benchmark/bench.sh" -b llamacpp \
+            2>&1 | tee -a "$LOG_FILE"
+    else
+        "${PROJECT_ROOT}/scripts/benchmark/llamacpp_bench.sh" -o "$RESULTS_DIR/llamacpp" \
+            2>&1 | tee -a "$LOG_FILE"
+    fi
 fi
 
-# ── LiteLLM ───────────────────────────────────────────────────────
 if [[ "$FRAMEWORK" == "all" || "$FRAMEWORK" == "litellm" ]]; then
     header "LiteLLM Proxy Benchmarks"
     LITELLM_RESULTS_DIR="$RESULTS_DIR/litellm" \
@@ -138,7 +150,6 @@ if [[ "$FRAMEWORK" == "all" || "$FRAMEWORK" == "litellm" ]]; then
         2>&1 | tee -a "$LOG_FILE"
 fi
 
-# ── GPU Summary ───────────────────────────────────────────────────
 header "GPU Summary"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu \
     --format=csv,noheader 2>/dev/null || echo "nvidia-smi not available"
@@ -152,9 +163,8 @@ echo -e "  Results: ${CYAN}$RESULTS_DIR/${NC}"
 echo -e "  Log:     ${CYAN}$LOG_FILE${NC}"
 echo ""
 
-# ── Parse results ─────────────────────────────────────────────────
-if [[ -f "${PROJECT_ROOT}/scripts/parse-results.py" ]]; then
+if [[ -f "${PROJECT_ROOT}/scripts/parse_bench.py" ]]; then
     log "Parsing results..."
-    python3 "${PROJECT_ROOT}/scripts/parse-results.py" --results-dir "$RESULTS_DIR" \
+    python3 "${PROJECT_ROOT}/scripts/parse_bench.py" "$RESULTS_DIR" --all \
         2>&1 | tee -a "$LOG_FILE"
 fi

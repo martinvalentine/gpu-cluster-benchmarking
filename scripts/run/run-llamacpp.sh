@@ -23,7 +23,7 @@ POSITIONAL:
   MODEL_PATH              Path to GGUF model (default: $DEFAULT_MODEL)
 
 OPTIONS:
-  -p, --port PORT         Server port (default: 8003)
+  -p, --port PORT         Server port (default: 8001)
   -H, --host HOST         Bind host (default: 0.0.0.0)
   -n, --ccu N             Concurrent slots / CCU (default: 4)
   -c, --context N         Total context size (default: 4096)

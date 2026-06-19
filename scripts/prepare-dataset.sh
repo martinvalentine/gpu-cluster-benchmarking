@@ -4,24 +4,28 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python"
+if [[ ! -f "$PYTHON_BIN" ]]; then
+    PYTHON_BIN="$(command -v python3 2>/dev/null || echo python3)"
+fi
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
 Download and prepare benchmark dataset (Vietnamese vi-alpaca → ShareGPT format).
 
-Default: downloads to /workspace/datasets/sharegpt.json
-Falls back to English ShareGPT if Vietnamese dataset fails.
-
-OPTIONS:
-  -d, --dir DIR         Destination directory (default: /workspace/datasets)
+Default: downloads to ${PROJECT_ROOT}/datasets/sharegpt.json
+  (override with BENCH_DATASET_DIR env var)
+...
+  -d, --dir DIR         Destination directory (default: ./datasets)
   -o, --output FILE     Output filename (default: sharegpt.json)
   --skip-existing       Skip if output file already exists
   --dry-run             Show what would happen without downloading
   -h, --help            Show this help
 
 EXAMPLES:
-  $(basename "$0")                                        # Default: /workspace/datasets/
+  $(basename "$0")                                        # Default: ./datasets/
   $(basename "$0") -d /data/benchmarks                   # Custom directory
   $(basename "$0") -o my_dataset.json                     # Custom filename
   $(basename "$0") --skip-existing                        # Skip if exists
@@ -29,7 +33,7 @@ EOF
     exit 0
 }
 
-DEST_DIR="/workspace/datasets"
+DEST_DIR="${BENCH_DATASET_DIR:-${PROJECT_ROOT}/datasets}"
 OUTPUT="sharegpt.json"
 SKIP_EXISTING=0
 DRY_RUN=0
@@ -69,7 +73,6 @@ echo -e "  ${CYAN}Destination${NC}  $OUTPUT_PATH"
 echo -e "  ${CYAN}Strategy${NC}     Vietnamese vi-alpaca → English ShareGPT fallback"
 echo ""
 
-# ── Check existing ──────────────────────────────────────────────────────
 if [[ "$SKIP_EXISTING" -eq 1 && -f "$OUTPUT_PATH" ]]; then
     SIZE=$(du -sh "$OUTPUT_PATH" 2>/dev/null | cut -f1)
     ok "Dataset already exists: $OUTPUT_PATH ($SIZE)"
@@ -84,14 +87,13 @@ fi
 
 mkdir -p "$DEST_DIR"
 
-# ── Try Vietnamese vi-alpaca first ─────────────────────────────────────
 log "Attempting Vietnamese vi-alpaca dataset..."
 
-python3 -c "
+$PYTHON_BIN -c "
 import os, json, sys
 
 try:
-    os.system('pip install datasets pyarrow -q')
+    os.system('uv pip install datasets pyarrow -q')
     from datasets import load_dataset
     print('Loading vi-alpaca from Hugging Face...')
     ds = load_dataset('bkai-foundation-models/vi-alpaca', split='train')
@@ -116,14 +118,13 @@ except Exception as e:
 
 if [[ $? -eq 0 ]] && [[ -f "$OUTPUT_PATH" ]]; then
     SIZE=$(du -sh "$OUTPUT_PATH" | cut -f1)
-    COUNT=$(python3 -c "import json; print(len(json.load(open('$OUTPUT_PATH'))))" 2>/dev/null || echo "?")
+    COUNT=$($PYTHON_BIN -c "import json; print(len(json.load(open('$OUTPUT_PATH'))))" 2>/dev/null || echo "?")
     ok "Vietnamese vi-alpaca downloaded: $COUNT samples ($SIZE)"
     exit 0
 fi
 
 warn "Vietnamese dataset failed, falling back to English ShareGPT..."
 
-# ── Fallback: English ShareGPT ──────────────────────────────────────────
 log "Downloading English ShareGPT..."
 
 wget -q -O "$OUTPUT_PATH" \
@@ -135,7 +136,7 @@ wget -q -O "$OUTPUT_PATH" \
 
 if [[ -f "$OUTPUT_PATH" ]]; then
     SIZE=$(du -sh "$OUTPUT_PATH" | cut -f1)
-    COUNT=$(python3 -c "import json; print(len(json.load(open('$OUTPUT_PATH'))))" 2>/dev/null || echo "?")
+    COUNT=$($PYTHON_BIN -c "import json; print(len(json.load(open('$OUTPUT_PATH'))))" 2>/dev/null || echo "?")
     ok "English ShareGPT downloaded: $COUNT samples ($SIZE)"
 else
     fail "Dataset download failed"
