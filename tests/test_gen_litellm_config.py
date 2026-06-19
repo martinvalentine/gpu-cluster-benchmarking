@@ -107,6 +107,35 @@ def test_gguf_embedding_model_returns_filename_only(tmp_path):
     assert "/" not in result
 
 
+# T1: resolve_hf_path returns search_dirs[0]/local_dir
+def test_hf_path_returns_first_search_dir(tmp_path):
+    """HF path: returns search_dirs[0] joined with local_dir."""
+    model = {"name": "test", "backend": "vllm", "local_dir": "hf/test"}
+    result = glc.resolve_hf_path(model, [tmp_path], strict=False)
+    assert result == str(tmp_path / "hf" / "test")
+
+
+# T2: strict=True + missing dir raises FileNotFoundError with remediation
+def test_hf_path_strict_raises_with_remediation(tmp_path):
+    """Strict mode + missing dir → FileNotFoundError with remediation block."""
+    missing = tmp_path / "does_not_exist"
+    model = {"name": "test", "backend": "vllm", "local_dir": "hf/missing"}
+    with pytest.raises(FileNotFoundError) as exc_info:
+        glc.resolve_hf_path(model, [missing], strict=True)
+    msg = str(exc_info.value)
+    assert "Remediation" in msg
+    assert "--base-dir" in msg
+
+
+# T3: strict=False + missing dir returns path anyway (soft pass)
+def test_hf_path_non_strict_returns_path_even_if_missing(tmp_path):
+    """Non-strict mode + missing dir → returns path; caller notes the warning."""
+    missing = tmp_path / "does_not_exist"
+    model = {"name": "test", "backend": "vllm", "local_dir": "hf/missing"}
+    result = glc.resolve_hf_path(model, [missing], strict=False)
+    assert result == str(missing / "hf" / "missing")
+
+
 # --- Tests T12–T14: generate_config integration ---
 # (added in task 10)
 

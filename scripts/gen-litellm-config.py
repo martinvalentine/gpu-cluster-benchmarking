@@ -136,6 +136,23 @@ def resolve_gguf_filename(model, search_dirs):
     )
 
 
+def resolve_hf_path(model, search_dirs, strict):
+    """Return the HF model path. If strict and missing, raise with remediation."""
+    path = Path(search_dirs[0]) / model.get("local_dir", "")
+    if not path.exists():
+        if strict:
+            raise FileNotFoundError(
+                f"HF model directory not found: {path}\n"
+                f"  --base-dir was passed; expected the path to exist on this host.\n"
+                f"Remediation:\n"
+                f"  - Verify the --base-dir argument points to a real directory\n"
+                f"  - Or drop --base-dir to use the default (container path) with soft warnings\n"
+                f"  - Or set $LITELLM_BASE_DIR to a path that contains the model files"
+            )
+        # soft warning path: return path anyway, caller notes it
+    return str(path)
+
+
 def generate_config(config: dict, project_root: Path) -> dict:
     """Generate litellm_config.yaml content from models.yaml."""
     ports = config.get("ports", {})
