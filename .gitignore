@@ -9,6 +9,8 @@ analysis_outputs/
 dev_*.md
 .omo/
 superpowers*/
+.opencode/
+.sisyphus/
 
 ####################################### Python
 # Byte-compiled / optimized / DLL files
