@@ -154,3 +154,45 @@ def test_t4_missing_hardware_uses_n_a(tmp_path, monkeypatch):
     assert data["hardware"]["gpu_vram_mib"] == 0
     assert data["hardware"]["cuda_version"] == "N/A"
     assert data["hardware"]["cpu_cores"] == 0
+
+
+def test_flatten_params_none_returns_empty():
+    """_flatten_params(None) and _flatten_params({}) return empty dict (backward compat)."""
+    from scripts.parse_bench import _flatten_params
+    assert _flatten_params(None) == {}
+    assert _flatten_params({}) == {}
+
+
+def test_flatten_params_flattens_correctly():
+    """_flatten_params flattens nested groups into params.* keys."""
+    from scripts.parse_bench import _flatten_params
+    params = {
+        "server": {"model": "test", "port": 8001},
+        "hardware": {"gpu_count": 2},
+        "system": {"git_commit": "abc123"},
+    }
+    result = _flatten_params(params)
+    assert result["params.server.model"] == "test"
+    assert result["params.server.port"] == 8001
+    assert result["params.hardware.gpu_count"] == 2
+    assert result["params.system.git_commit"] == "abc123"
+    assert len(result) == 4  # exactly 4 keys, no partial flattening
+
+
+def test_load_params_from_dir(tmp_path):
+    """_load_params_from_dir loads params.json from a directory, returns None if missing."""
+    from scripts.parse_bench import _load_params_from_dir
+
+    # No params.json → None
+    assert _load_params_from_dir(tmp_path) is None
+
+    # Params.json exists → parsed dict
+    params_file = tmp_path / "params.json"
+    params_file.write_text('{"server": {"model": "test"}}')
+    result = _load_params_from_dir(tmp_path)
+    assert result is not None
+    assert result["server"]["model"] == "test"
+
+    # Malformed params.json → None
+    params_file.write_text('{bad json')
+    assert _load_params_from_dir(tmp_path) is None
