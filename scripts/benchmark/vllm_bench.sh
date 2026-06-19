@@ -122,6 +122,8 @@ ok()   { echo -e "${GREEN}  ✓${NC} $*"; }
 warn() { echo -e "${YELLOW}  ⚠${NC} $*"; }
 fail() { echo -e "${RED}  ✗${NC} $*"; }
 
+source "${SCRIPT_DIR}/_embed_params.sh"
+
 get_model_name() {
     curl -sf "${BASE_URL}/models" 2>/dev/null | python3 -c "
 import sys, json
@@ -165,6 +167,28 @@ TIMESTAMP="$(date +%Y-%m-%d_%Hh%M)"
 MODEL_SHORT=$(detect_model_short "$MODEL_FULL")
 SESSION_DIR="${RESULTS_DIR}/${TIMESTAMP}_${MODEL_SHORT}_vllm"
 mkdir -p "$SESSION_DIR"
+
+# Capture server params snapshot for this run
+PARAMS_FILE="${RESULTS_DIR}/_active_params.json"
+PARAMS_SNAPSHOT="${SESSION_DIR}/params.json"
+if [[ -f "$PARAMS_FILE" ]]; then
+    cp "$PARAMS_FILE" "$PARAMS_SNAPSHOT"
+    log "Server params snapshot: $PARAMS_SNAPSHOT"
+    if command -v jq &>/dev/null; then
+        log "  model:    $(jq -r '.server.model' "$PARAMS_SNAPSHOT")"
+        log "  endpoint: $(jq -r '.server.endpoint' "$PARAMS_SNAPSHOT")"
+        log "  ctk/ctv:  $(jq -r '.server.cache_key' "$PARAMS_SNAPSHOT")/$(jq -r '.server.cache_val' "$PARAMS_SNAPSHOT")"
+        log "  fa:       $(jq -r '.server.flash_attn' "$PARAMS_SNAPSHOT")"
+        log "  n_parallel: $(jq -r '.server.n_parallel' "$PARAMS_SNAPSHOT")"
+        log "  gpu:      $(jq -r '.hardware.gpu_count' "$PARAMS_SNAPSHOT")x $(jq -r '.hardware.gpu_name' "$PARAMS_SNAPSHOT")"
+        log "  cuda:     $(jq -r '.hardware.cuda_version' "$PARAMS_SNAPSHOT")"
+        log "  commit:   $(jq -r '.system.git_commit' "$PARAMS_SNAPSHOT")"
+    else
+        warn "jq not found; server params logged to $PARAMS_SNAPSHOT only"
+    fi
+else
+    warn "No _active_params.json at $PARAMS_FILE — run a run-*.sh script first. Params will be missing from sweep results."
+fi
 
 # Auto-detect max model length from endpoint to cap prompt ladder
 MAX_MODEL_LEN=$(curl -sf "${BASE_URL}/models" 2>/dev/null | python3 -c "
@@ -296,6 +320,7 @@ else
         --save-result "$SESSION_DIR/ccu_sweep.json" \
         --runs "$RUNS" \
         2>&1 && ok "Concurrency sweep saved to $SESSION_DIR/ccu_sweep.json" || warn "Concurrency sweep had errors"
+embed_params_in_sweep "$SESSION_DIR/ccu_sweep.json"
 
     stop_gpu_monitor
 
@@ -316,6 +341,7 @@ else
         --save-result "$SESSION_DIR/prompt_sweep.json" \
         --runs "$RUNS" \
         2>&1 && ok "Prompt sweep saved to $SESSION_DIR/prompt_sweep.json" || warn "Prompt sweep had errors"
+embed_params_in_sweep "$SESSION_DIR/prompt_sweep.json"
 
     stop_gpu_monitor
 fi
@@ -360,6 +386,7 @@ if [[ "$NATIVE" -eq 1 ]]; then
                 --result-dir "$SESSION_DIR" \
                 --result-filename "native_conc${CONC}.json" \
                 2>&1 && ok "  native conc=$CONC saved" || warn "  native conc=$CONC failed"
+embed_params_in_sweep "$SESSION_DIR/native_conc${CONC}.json"
             sleep 3
         done
 
