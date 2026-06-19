@@ -28,7 +28,7 @@ FIELDNAMES = [
     "mean_tpot_ms", "p99_tpot_ms",
     "mean_itl_ms", "p99_itl_ms",
     "total_input_tokens", "total_generated_tokens",
-    "params.server.model", "params.server.endpoint", "params.server.port",
+    "params.server.model", "params.server.model_path", "params.server.endpoint", "params.server.port",
     "params.server.tp_size", "params.server.max_model_len", "params.server.max_num_seqs",
     "params.server.gpu_mem_util", "params.server.n_parallel", "params.server.ctx_size",
     "params.server.batch", "params.server.ubatch", "params.server.threads",
