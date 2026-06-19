@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "${SCRIPT_DIR}/write_params.sh"
 
 # Load .env if exists (does not override existing env vars)
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
@@ -98,6 +99,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 MODEL="${MODEL:-$DEFAULT_MODEL}"
+backend="llamacpp"
+write_params "$backend"
 SLOT_CTX=$(( CTX_SIZE / N_PARALLEL ))
 
 GPU_NAME="N/A"
