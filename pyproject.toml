@@ -20,7 +20,9 @@ common = [
     "psutil",
     "gputil",
     "redis",
-    "requests"
+    "requests",
+    "datasets>=5.0.0",
+    "pyarrow>=24.0.0",
 ]
 
 vllm = [
@@ -39,6 +41,7 @@ benchmark = [
     "numpy",
     "tqdm",
     "transformers",
+    "matplotlib>=3.11.0",
 ]
 
 litellm = [
