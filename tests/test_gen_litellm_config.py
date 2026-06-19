@@ -195,6 +195,38 @@ def test_dispatcher_routes_sglang(tmp_path, monkeypatch):
 
 
 # --- Tests T15–T21: main() error collection, summary, strict-mode ---
+
+
+# T16: --base-dir with nonexistent path → exit 1 with hard error
+def test_main_base_dir_nonexistent_exits_1(tmp_path, capsys):
+    """--base-dir with a path that doesn't exist triggers a hard error."""
+    nonexistent = tmp_path / "nonexistent"
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump({"models": [
+        {"name": "test", "backend": "vllm", "enabled": True, "endpoint": True,
+         "local_dir": "hf/test", "vllm_tp": 1}
+    ], "base_dir": str(tmp_path), "ports": {}}))
+    with pytest.raises(SystemExit) as exc_info:
+        glc.main(["--config", str(config_path), "--base-dir", str(nonexistent),
+                  "--preview"])
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""  # nothing written to stdout
+    assert "Remediation" in captured.err
+    assert "test" in captured.err  # model name appears in the error
+
+
+# T19: search_dirs=[] + strict=True → raises UnresolvableFilename (nothing to search)
+def test_resolve_with_empty_search_dirs_strict(tmp_path):
+    """Combinatorial: empty search_dirs + strict=True → UnresolvableFilename."""
+    model = {
+        "name": "test", "backend": "llamacpp", "local_dir": "gguf/missing",
+        "include": "*q4_k_m.gguf",
+    }
+    with pytest.raises(glc.UnresolvableFilename):
+        glc.resolve_model_path(model, [], strict=True)
+
+
 # (added in tasks 8, 9, 10)
 
 

@@ -142,7 +142,7 @@ def resolve_hf_path(model, search_dirs, strict):
     if not path.exists():
         if strict:
             raise FileNotFoundError(
-                f"HF model directory not found: {path}\n"
+                f"HF model '{model.get('name', 'unknown')}' directory not found: {path}\n"
                 f"  --base-dir was passed; expected the path to exist on this host.\n"
                 f"Remediation:\n"
                 f"  - Verify the --base-dir argument points to a real directory\n"
@@ -166,27 +166,49 @@ def resolve_model_path(model, search_dirs, strict):
     return resolve_hf_path(model, search_dirs, strict)
 
 
-def generate_config(config: dict, project_root: Path) -> dict:
-    """Generate litellm_config.yaml content from models.yaml."""
+def generate_config(config: dict, project_root: Path, search_dirs, strict) -> dict:
+    """Generate litellm_config.yaml content from models.yaml.
+
+    search_dirs: list of directories to search for model files.
+                 CLI-passed dirs (via --base-dir) come first;
+                 config['base_dir'] is appended last as the default.
+    strict: if True, missing HF paths raise hard errors.
+            If False, missing HF paths produce soft warnings (WARN tag
+            in summary, model still included in output).
+    """
     ports = config.get("ports", {})
     base_dir = Path(config.get("base_dir", "models"))
     if not base_dir.is_absolute():
         base_dir = project_root / base_dir
+    # search_dirs: CLI-passed first, then config default
+    all_search_dirs = list(search_dirs) + [base_dir]
 
     models = config.get("models", [])
-
-    # Collect endpoint-enabled models
+    hard_errors: list[str] = []
+    soft_warnings: list[tuple[str, str]] = []  # (model_name, warning_text)
     model_list = []
+
     for m in models:
         if not m.get("enabled", True):
             continue
         if m.get("endpoint") is False:
             continue
 
+        try:
+            model_id = resolve_model_path(m, all_search_dirs, strict=strict)
+        except (UnresolvableFilename, AmbiguousFilename, FileNotFoundError) as e:
+            hard_errors.append(str(e))
+            continue
+
+        # Soft warning: HF path missing in non-strict mode
+        if m.get("backend") in ("vllm", "sglang"):
+            if not Path(model_id).exists():
+                soft_warnings.append((m.get("name", "unknown"),
+                                     f"{model_id} not found in {Path(model_id).parent}"))
+
         backend = m.get("backend", "vllm")
         port = m.get("api_port", ports.get(backend, 8000))
         proxy_name = m.get("proxy_name", m.get("name", "unknown"))
-        model_id = resolve_model_id(m, base_dir, project_root)
 
         model_list.append({
             "model_name": proxy_name,
@@ -197,11 +219,16 @@ def generate_config(config: dict, project_root: Path) -> dict:
             },
         })
 
-    litellm_config = {
+    # Exit with all errors printed if any hard error
+    if hard_errors:
+        for err in hard_errors:
+            print(err, file=sys.stderr)
+        print(f"\nAborted: {len(hard_errors)} hard error(s), 0 models written.", file=sys.stderr)
+        sys.exit(1)
+
+    return {
         "model_list": model_list,
-        "router_settings": {
-            "routing_strategy": "least-busy",
-        },
+        "router_settings": {"routing_strategy": "least-busy"},
         "litellm_settings": {
             "set_verbose": False,
             "num_retries": 2,
@@ -209,19 +236,20 @@ def generate_config(config: dict, project_root: Path) -> dict:
             "success_callback": ["prometheus"],
             "failure_callback": ["prometheus"],
             "cache": True,
-            "cache_params": {
-                "type": "redis",
-                "host": "localhost",
-                "port": 6379,
-                "ttl": 3600,
-            },
+            "cache_params": {"type": "redis", "host": "localhost", "port": 6379, "ttl": 3600},
         },
     }
 
-    return litellm_config
+
+def print_summary(litellm_config, config, project_root, args, file=None):
+    """Placeholder; real implementation in Task 9."""
+    if file is None:
+        file = sys.stdout
+    model_count = len(litellm_config.get("model_list", []))
+    print(f"\n  Generated LiteLLM config ({model_count} models)", file=file)
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -243,39 +271,44 @@ def main():
         action="store_true",
         help="Print to stdout only, don't write file",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--base-dir",
+        action="append",
+        default=None,
+        dest="base_dirs",
+        help="Path to search for models (can be passed multiple times; CLI dirs "
+             "are prepended to the config's base_dir)",
+    )
+    args = parser.parse_args(args)
+
+    # Reject empty --base-dir at parse time (before any other work)
+    if args.base_dirs is not None:
+        for d in args.base_dirs:
+            if not d:
+                parser.error("--base-dir cannot be empty (check shell variable expansion)")
+
+    # strict is an explicit intent signal: user passed --base-dir, so they
+    # expect validation. False otherwise (default config base_dir is
+    # expected to live in the container).
+    strict = args.base_dirs is not None
+    cli_base_dirs = args.base_dirs or []
 
     project_root = Path(__file__).resolve().parent.parent
-    args.output = project_root / args.output
-
+    args.config = project_root / args.config
     if not args.config.exists():
         print(f"ERROR: Config not found: {args.config}", file=sys.stderr)
         sys.exit(1)
 
-    config = load_config(project_root / args.config)
-    litellm_config = generate_config(config, project_root)
+    config = load_config(args.config)
+    litellm_config = generate_config(config, project_root, search_dirs=cli_base_dirs, strict=strict)
 
     output = yaml.dump(litellm_config, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
     if args.preview:
         print(output)
         sys.exit(0)
-
+    args.output = project_root / args.output
     args.output.write_text(output)
-
-    model_count = len(litellm_config.get("model_list", []))
-    G, C, B, NC = "\033[0;32m", "\033[0;36m", "\033[1m", "\033[0m"
-
-    print(f"\n  {G}{B}Generated LiteLLM config{NC}")
-    print(f"  {C}Output{NC}     {args.output}")
-    print(f"  {C}Models{NC}     {model_count} endpoint(s)")
-    print()
-    for m in litellm_config.get("model_list", []):
-        name = m["model_name"]
-        backend_id = m["litellm_params"]["model"]
-        api_base = m["litellm_params"]["api_base"]
-        print(f"  {C}{name:<25}{NC} → {backend_id} @ {api_base}")
-    print()
+    print_summary(litellm_config, config, project_root, args, file=sys.stderr)
 
 
 if __name__ == "__main__":
